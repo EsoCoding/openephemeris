@@ -5,6 +5,16 @@ option(OE_BUILD_SHARED "Build the shared library" ON)
 option(OE_BUILD_TESTS "Build tests" ON)
 option(OE_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
 
+set(OE_DATA_DIR "${CMAKE_CURRENT_SOURCE_DIR}/data" CACHE PATH
+    "Directory in which ephemeris kernels are stored")
+
+add_custom_target(oe-data
+    COMMAND ${CMAKE_COMMAND}
+        -DOE_DATA_DIR=${OE_DATA_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tools/fetch_de440.cmake
+    COMMENT "Downloading and verifying the JPL DE440 ephemeris"
+    VERBATIM)
+
 set(OE_SOURCES
     src/oe_api.c
     src/oe_time.c
@@ -76,6 +86,13 @@ if(OE_BUILD_TESTS)
   add_executable(oe_tests tests/test_main.c)
   target_link_libraries(oe_tests PRIVATE OpenEphemeris::static)
   add_test(NAME oe_tests COMMAND oe_tests)
+  add_custom_target(oe-test-data
+      COMMAND ${CMAKE_COMMAND} -E env
+          OE_TEST_KERNEL=${OE_DATA_DIR}/de440.bsp
+          ${CMAKE_CTEST_COMMAND} --test-dir ${CMAKE_BINARY_DIR} --output-on-failure
+      DEPENDS oe_tests oe-data
+      COMMENT "Running tests with the verified DE440 kernel"
+      VERBATIM)
 endif()
 
 add_executable(oe-example examples/positions.c)

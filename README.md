@@ -32,18 +32,17 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
 
-Fetch and verify DE440 with the optional, non-runtime Python tool:
+Download and verify DE440 using the existing CMake installation:
 
 ```sh
-python3 tools/oe_data.py --output data
-OE_TEST_KERNEL=/absolute/path/to/data/de440.bsp \
-  ctest --test-dir build --output-on-failure
+cmake --build build --target oe-data
+cmake --build build --target oe-test-data
 ./build/oe-example data/de440.bsp
 ```
 
-`tools/oe_data.py --chiron` can also preserve a reproducible Horizons Chiron
-kernel and manifest, but the runtime rejects its type-21 segment until that
-reader passes the independent validation gate.
+`oe-data` stores the verified kernel and its manifest in `data/`. Both are
+ignored by Git. No Python installation and no manually entered absolute path
+are required.
 
 ## Minimal API example
 

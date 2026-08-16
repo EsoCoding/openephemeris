@@ -7,4 +7,4 @@ SOFA collection.
 
 JPL and Horizons kernels are data inputs and are not part of the source
 distribution. Their source, identity, coverage, and SHA-256 are recorded by
-`tools/oe_data.py` in `data/manifest.json`.
+the `oe-data` CMake target in `data/manifest.json`.
