@@ -1,4 +1,5 @@
 #include "oe_internal.h"
+#include <limits.h>
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -68,15 +69,19 @@ static void cheb(const double *c,int degree,double x,double scale,double *value,
     for(k=degree;k>=1;k--){double b=2*x*b1-b2+c[k];double d=2*x*d1-d2+2*b1; b2=b1;b1=b;d2=d1;d1=d;}
     *value=x*b1-b2+c[0]; *deriv=(x*d1-d2+b1)*scale;
 }
-static oe_status eval_segment(const oe_spk *s,const oe_spk_segment *g,double et,oe_state *o) {
+static oe_status eval_chebyshev_segment(const oe_spk *s,const oe_spk_segment *g,
+                                        double et,oe_state *o) {
     double init,intlen,rsize_d,n_d,mid,rad,x,*r; int rsize,n,index,degree,j; int64_t a;
-    if(g->type!=2&&g->type!=3) return OE_ERR_UNSUPPORTED_KERNEL;
     if(!get_double(s,g->last_addr-3,&init)||!get_double(s,g->last_addr-2,&intlen)||
        !get_double(s,g->last_addr-1,&rsize_d)||!get_double(s,g->last_addr,&n_d))return OE_ERR_BAD_KERNEL;
-    rsize=(int)rsize_d;n=(int)n_d;if(rsize<5||n<1||intlen<=0)return OE_ERR_BAD_KERNEL;
+    if(!isfinite(init)||!isfinite(intlen)||!isfinite(rsize_d)||!isfinite(n_d)||
+       rsize_d<5.0||rsize_d>(double)INT_MAX||n_d<1.0||n_d>(double)INT_MAX)
+        return OE_ERR_BAD_KERNEL;
+    rsize=(int)rsize_d;n=(int)n_d;
+    if(rsize_d!=(double)rsize||n_d!=(double)n||intlen<=0)return OE_ERR_BAD_KERNEL;
     index=(int)floor((et-init)/intlen);if(index==n&&et<=g->last_et)index=n-1;if(index<0||index>=n)return OE_ERR_NO_COVERAGE;
     a=g->first_addr+(int64_t)index*rsize;r=(double*)malloc((size_t)rsize*sizeof(double));if(!r)return OE_ERR_IO;
-    for(j=0;j<rsize;j++)if(!get_double(s,a+j,&r[j])){free(r);return OE_ERR_BAD_KERNEL;}
+    for(j=0;j<rsize;j++)if(!get_double(s,a+j,&r[j])||!isfinite(r[j])){free(r);return OE_ERR_BAD_KERNEL;}
     mid=r[0];rad=r[1];x=(et-mid)/rad;if(fabs(x)>1.0000000001){free(r);return OE_ERR_BAD_KERNEL;}
     degree=(rsize-2)/(g->type==2?3:6)-1;
     if(degree<0||(2+(g->type==2?3:6)*(degree+1))!=rsize){free(r);return OE_ERR_BAD_KERNEL;}
@@ -88,7 +93,108 @@ static oe_status eval_segment(const oe_spk *s,const oe_spk_segment *g,double et,
     }
     free(r);return OE_OK;
 }
-static oe_status relative_ssb(const oe_spk *s,int target,double et,oe_state *o,int depth) {
+
+static oe_status eval_type21_segment(const oe_spk *s,const oe_spk_segment *g,
+                                     double et,oe_state *o) {
+    double maxdim_d,nrec_d,epoch,line[4*OE_SPK21_MAX_TERMS+11];
+    double fc[OE_SPK21_MAX_TERMS+1]={1.0};
+    double wc[OE_SPK21_MAX_TERMS+1]={0.0};
+    double w[OE_SPK21_MAX_TERMS+3]={0.0};
+    double delta,tp,sum;
+    int maxdim,nrec,ndir,dlsize,low,high,index,j,i;
+    int kqmax1,kq[3],mq2,ks,ks1,jx;
+    int64_t epoch_base,record_address;
+    if(!get_double(s,g->last_addr-1,&maxdim_d)||
+       !get_double(s,g->last_addr,&nrec_d)) return OE_ERR_BAD_KERNEL;
+    if(!isfinite(maxdim_d)||!isfinite(nrec_d)||maxdim_d<15.0||
+       maxdim_d>(double)OE_SPK21_MAX_TERMS||nrec_d<1.0||
+       nrec_d>(double)INT_MAX||
+       nrec_d>(double)((g->last_addr-g->first_addr+1)/71))
+        return OE_ERR_BAD_KERNEL;
+    maxdim=(int)maxdim_d;nrec=(int)nrec_d;
+    if(maxdim_d!=(double)maxdim||nrec_d!=(double)nrec) return OE_ERR_BAD_KERNEL;
+    dlsize=4*maxdim+11;ndir=nrec/100;
+    epoch_base=g->last_addr-ndir-2-nrec+1;
+    if(epoch_base!=g->first_addr+(int64_t)nrec*dlsize) return OE_ERR_BAD_KERNEL;
+
+    low=0;high=nrec;
+    while(low<high){
+        int middle=low+(high-low)/2;
+        if(!get_double(s,epoch_base+middle,&epoch)||!isfinite(epoch)) return OE_ERR_BAD_KERNEL;
+        if(epoch<et)low=middle+1;else high=middle;
+    }
+    index=low;
+    if(index>=nrec) return OE_ERR_NO_COVERAGE;
+    record_address=g->first_addr+(int64_t)index*dlsize;
+    for(j=0;j<dlsize;j++)
+        if(!get_double(s,record_address+j,&line[j])||!isfinite(line[j]))
+            return OE_ERR_BAD_KERNEL;
+
+    if(line[4*maxdim+7]<3.0||line[4*maxdim+7]>(double)(maxdim+1))
+        return OE_ERR_BAD_KERNEL;
+    kqmax1=(int)line[4*maxdim+7];
+    if(line[4*maxdim+7]!=(double)kqmax1)return OE_ERR_BAD_KERNEL;
+    for(i=0;i<3;i++)
+        if(line[4*maxdim+8+i]<1.0||line[4*maxdim+8+i]>(double)maxdim)
+            return OE_ERR_BAD_KERNEL;
+        else {
+            kq[i]=(int)line[4*maxdim+8+i];
+            if(line[4*maxdim+8+i]!=(double)kq[i])return OE_ERR_BAD_KERNEL;
+        }
+
+    delta=et-line[0];tp=delta;mq2=kqmax1-2;ks=kqmax1-1;
+    for(j=1;j<=mq2;j++){
+        if(line[j]==0.0)return OE_ERR_BAD_KERNEL;
+        fc[j]=tp/line[j];wc[j]=delta/line[j];tp=delta+line[j];
+    }
+    for(j=1;j<=kqmax1;j++)w[j]=1.0/(double)j;
+    jx=0;ks1=ks-1;
+    while(ks>=2){
+        ++jx;
+        for(j=1;j<=jx;j++)w[j+ks]=fc[j]*w[j+ks1]-wc[j]*w[j+ks];
+        ks=ks1;--ks1;
+    }
+    for(i=0;i<3;i++){
+        const double *dt=line+maxdim+7+i*maxdim;
+        sum=0.0;
+        for(j=kq[i];j>=1;j--)sum+=dt[j-1]*w[j+ks];
+        ((double*)&o->p)[i]=line[maxdim+1+2*i]+delta*(line[maxdim+2+2*i]+delta*sum);
+    }
+    for(j=1;j<=jx;j++)w[j+ks]=fc[j]*w[j+ks1]-wc[j]*w[j+ks];
+    --ks;
+    for(i=0;i<3;i++){
+        const double *dt=line+maxdim+7+i*maxdim;
+        sum=0.0;
+        for(j=kq[i];j>=1;j--)sum+=dt[j-1]*w[j+ks];
+        ((double*)&o->v)[i]=line[maxdim+2+2*i]+delta*sum;
+    }
+    for(i=0;i<3;i++)
+        if(!isfinite(((double*)&o->p)[i])||!isfinite(((double*)&o->v)[i]))
+            return OE_ERR_NUMERIC;
+    return OE_OK;
+}
+
+static oe_status eval_segment(const oe_spk *s,const oe_spk_segment *g,
+                              double et,oe_state *o) {
+    if(g->frame!=1)return OE_ERR_UNSUPPORTED_KERNEL;
+    if(g->type==2||g->type==3)return eval_chebyshev_segment(s,g,et,o);
+    if(g->type==21)return eval_type21_segment(s,g,et,o);
+    return OE_ERR_UNSUPPORTED_KERNEL;
+}
+
+oe_status oe_spk_direct_state(const oe_spk *s,int target,int center,double et,
+                              oe_state *o) {
+    size_t i;
+    if(!s||!o||!isfinite(et))return OE_ERR_INVALID_ARGUMENT;
+    for(i=s->segment_count;i>0;i--){const oe_spk_segment *g=&s->segments[i-1];
+        if(g->target==target&&g->center==center&&et>=g->first_et&&et<=g->last_et)
+            return eval_segment(s,g,et,o);
+    }
+    return OE_ERR_NO_COVERAGE;
+}
+
+static oe_status relative_ssb(const oe_spk *s,int target,double et,
+                              oe_state *o,int depth) {
     size_t i; oe_state local,parent; oe_status st;
     if(target==0){memset(o,0,sizeof(*o));return OE_OK;} if(depth>8)return OE_ERR_BAD_KERNEL;
     for(i=s->segment_count;i>0;i--){const oe_spk_segment *g=&s->segments[i-1];
@@ -101,6 +207,8 @@ static oe_status relative_ssb(const oe_spk *s,int target,double et,oe_state *o,i
 }
 oe_status oe_spk_state(const oe_spk *s,int target,int center,double et,oe_state *o) {
     oe_state a,b;oe_status st;if(!s||!o||!isfinite(et))return OE_ERR_INVALID_ARGUMENT;
-    st=relative_ssb(s,target,et,&a,0);if(st!=OE_OK)return st;st=relative_ssb(s,center,et,&b,0);if(st!=OE_OK)return st;
-    o->p.x=a.p.x-b.p.x;o->p.y=a.p.y-b.p.y;o->p.z=a.p.z-b.p.z;o->v.x=a.v.x-b.v.x;o->v.y=a.v.y-b.v.y;o->v.z=a.v.z-b.v.z;return OE_OK;
+    st=relative_ssb(s,target,et,&a,0);if(st!=OE_OK)return st;
+    st=relative_ssb(s,center,et,&b,0);if(st!=OE_OK)return st;
+    o->p.x=a.p.x-b.p.x;o->p.y=a.p.y-b.p.y;o->p.z=a.p.z-b.p.z;
+    o->v.x=a.v.x-b.v.x;o->v.y=a.v.y-b.v.y;o->v.z=a.v.z-b.v.z;return OE_OK;
 }

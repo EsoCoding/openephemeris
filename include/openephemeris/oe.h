@@ -54,6 +54,8 @@ typedef enum oe_body {
     OE_MEAN_LILITH, OE_TRUE_LILITH, OE_CHIRON
 } oe_body;
 
+#define OE_BODY_COUNT 17u
+
 typedef struct oe_time {
     uint32_t struct_size;
     uint32_t abi_version;
@@ -87,12 +89,27 @@ typedef struct oe_house_result {
     uint32_t reserved;
 } oe_house_result;
 
+typedef struct oe_chart_result {
+    uint32_t struct_size;
+    uint32_t abi_version;
+    oe_time time;
+    oe_house_result houses;
+    oe_position_result positions[OE_BODY_COUNT];
+    double house_positions[OE_BODY_COUNT];
+    int32_t position_status[OE_BODY_COUNT];
+    int32_t house_status[OE_BODY_COUNT];
+    uint32_t flags;
+    uint32_t reserved;
+} oe_chart_result;
+
 OE_API const char *oe_version(void);
 OE_API const char *oe_status_string(oe_status status);
 OE_API oe_status oe_ephemeris_open(const char *planetary_kernel,
                                    const char *chiron_kernel,
                                    oe_ephemeris **out);
+OE_API oe_status oe_ephemeris_open_default(oe_ephemeris **out);
 OE_API void oe_ephemeris_close(oe_ephemeris *ephemeris);
+OE_API const char *oe_body_name(oe_body body);
 OE_API oe_status oe_time_from_jd(double jd_tt, double jd_ut1, oe_time *out);
 OE_API oe_status oe_time_from_utc(int year, int month, int day, int hour,
                                   int minute, double second, double dut1_seconds,
@@ -107,6 +124,11 @@ OE_API oe_status oe_placidus_house_position(const oe_time *time,
                                             double right_ascension_deg,
                                             double declination_deg,
                                             double *house_position);
+OE_API oe_status oe_chart_from_utc(const oe_ephemeris *ephemeris,
+                                   int year, int month, int day,
+                                   int hour, int minute, double second,
+                                   double latitude_deg, double longitude_deg,
+                                   oe_chart_result *out);
 
 #ifdef __cplusplus
 }

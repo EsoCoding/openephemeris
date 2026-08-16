@@ -8,15 +8,29 @@ option(OE_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
 set(OE_DATA_DIR "${CMAKE_CURRENT_SOURCE_DIR}/data" CACHE PATH
     "Directory in which ephemeris kernels are stored")
 
+add_executable(oe-horizons-decode tools/decode_horizons.c)
+if(MSVC)
+  target_compile_options(oe-horizons-decode PRIVATE /W4 $<$<BOOL:${OE_WARNINGS_AS_ERRORS}>:/WX>)
+else()
+  target_compile_options(oe-horizons-decode PRIVATE -Wall -Wextra -Wpedantic
+      $<$<BOOL:${OE_WARNINGS_AS_ERRORS}>:-Werror>)
+endif()
+
 add_custom_target(oe-data
     COMMAND ${CMAKE_COMMAND}
         -DOE_DATA_DIR=${OE_DATA_DIR}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/tools/fetch_de440.cmake
-    COMMENT "Downloading and verifying the JPL DE440 ephemeris"
+    COMMAND ${CMAKE_COMMAND}
+        -DOE_DATA_DIR=${OE_DATA_DIR}
+        -DOE_HORIZONS_DECODER=$<TARGET_FILE:oe-horizons-decode>
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tools/fetch_chiron.cmake
+    DEPENDS oe-horizons-decode
+    COMMENT "Downloading and verifying OpenEphemeris data"
     VERBATIM)
 
 set(OE_SOURCES
     src/oe_api.c
+    src/oe_chart.c
     src/oe_time.c
     src/oe_spk.c
     src/oe_astro.c
@@ -84,14 +98,16 @@ install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 if(OE_BUILD_TESTS)
   enable_testing()
   add_executable(oe_tests tests/test_main.c)
+  target_include_directories(oe_tests PRIVATE src)
   target_link_libraries(oe_tests PRIVATE OpenEphemeris::static)
   add_test(NAME oe_tests COMMAND oe_tests)
   add_custom_target(oe-test-data
       COMMAND ${CMAKE_COMMAND} -E env
           OE_TEST_KERNEL=${OE_DATA_DIR}/de440.bsp
+          OE_TEST_CHIRON=${OE_DATA_DIR}/chiron-2060-1800-2200.bsp
           ${CMAKE_CTEST_COMMAND} --test-dir ${CMAKE_BINARY_DIR} --output-on-failure
       DEPENDS oe_tests oe-data
-      COMMENT "Running tests with the verified DE440 kernel"
+      COMMENT "Running tests with the verified ephemeris kernels"
       VERBATIM)
 endif()
 

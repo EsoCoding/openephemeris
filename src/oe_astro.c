@@ -7,16 +7,25 @@ static double length(oe_vec3 a){return sqrt(a.x*a.x+a.y*a.y+a.z*a.z);}
 static oe_vec3 sub(oe_vec3 a,oe_vec3 b){oe_vec3 r={a.x-b.x,a.y-b.y,a.z-b.z};return r;}
 static oe_vec3 scale(oe_vec3 a,double s){oe_vec3 r={a.x*s,a.y*s,a.z*s};return r;}
 
+static oe_status body_ssb(const oe_ephemeris *e,int target,double et,oe_state *out){
+    oe_state relative,sun;oe_status status;
+    if(target!=20002060)return oe_spk_state(&e->planetary,target,0,et,out);
+    status=oe_spk_direct_state(&e->chiron,target,10,et,&relative);if(status!=OE_OK)return status;
+    status=oe_spk_state(&e->planetary,10,0,et,&sun);if(status!=OE_OK)return status;
+    out->p.x=relative.p.x+sun.p.x;out->p.y=relative.p.y+sun.p.y;out->p.z=relative.p.z+sun.p.z;
+    out->v.x=relative.v.x+sun.v.x;out->v.y=relative.v.y+sun.v.y;out->v.z=relative.v.z+sun.v.z;
+    return OE_OK;
+}
+
 static oe_status raw_apparent(const oe_ephemeris *e,int target,double jd,
                               double *lon,double *lat,double *dist) {
-    const oe_spk *kernel=&e->planetary; double et=(jd-OE_J2000)*OE_DAY_S;
+    double et=(jd-OE_J2000)*OE_DAY_S;
     oe_state earth,targ,sun;oe_vec3 r,u;double lt=0,rm[3][3],q[3],ec[3],dpsi,deps;
     double v[3],bm1,rs;int i;oe_status st;
-    if(target==2002060)kernel=&e->chiron;
     st=oe_spk_state(&e->planetary,399,0,et,&earth);if(st!=OE_OK)return st;
     st=oe_spk_state(&e->planetary,10,0,et,&sun);if(st!=OE_OK)return st;
     for(i=0;i<4;i++){
-        st=oe_spk_state(kernel,target,0,et-lt,&targ);if(st!=OE_OK)return st;
+        st=body_ssb(e,target,et-lt,&targ);if(st!=OE_OK)return st;
         r=sub(targ.p,earth.p);lt=length(r)/OE_C_KM_S;
     }
     *dist=length(r)/OE_AU_KM;u=scale(r,1.0/length(r));

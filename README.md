@@ -7,18 +7,19 @@ data, uses global mutable state, silently changes ephemeris, or substitutes a
 different house system.
 
 > Current release status: **0.1.0 development preview**, not 1.0. Planetary
-> DE440 calculations and Placidus are operational. Horizons type-21 support,
-> required for Chiron, remains a documented 1.0 gate. See
+> DE440 calculations, Chiron, and Placidus are operational. Broad independent
+> validation remains a documented 1.0 gate. See
 > [docs/STATUS.md](docs/STATUS.md).
 
 ## Implemented scope
 
 - apparent geocentric tropical longitude, latitude, distance, and speeds;
 - Sun, Moon, Mercury through Pluto using a JPL DE440 kernel;
+- Chiron using a pinned JPL Horizons type-21 kernel for 1800--2200;
 - mean/true lunar nodes and mean/true Black Moon Lilith;
 - Placidus cusps, Ascendant, MC, ARMC, and geometric house position;
 - explicit UTC/TT/UT1 handling and modeled-time quality flags;
-- endian-aware, bounds-checked DAF/SPK type 2 and 3 input;
+- endian-aware, bounds-checked DAF/SPK type 2, 3, and 21 input;
 - static and shared libraries on Linux and Windows-oriented CMake builds.
 
 The code is MIT licensed. The vendored ERFA 2.0.1 dependency is BSD-3-Clause.
@@ -32,17 +33,21 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
 
-Download and verify DE440 using the existing CMake installation:
+Download and verify DE440 through the build:
 
 ```sh
 cmake --build build --target oe-data
 cmake --build build --target oe-test-data
-./build/oe-example data/de440.bsp
+./build/oe-example
 ```
 
-`oe-data` stores the verified kernel and its manifest in `data/`. Both are
-ignored by Git. No Python installation and no manually entered absolute path
-are required.
+`oe-data` stores the verified DE440 and Chiron kernels and their manifests in
+`data/`. They are ignored by Git. No Python installation and no manually
+entered absolute path are required. If Horizons replaces the pinned Chiron
+orbit solution, validation fails instead of silently changing results. Horizons
+embeds the request date in its comment block, so the manifest records each
+download's actual SHA-256 while the downloader pins solution JPL#171, object ID,
+and coverage.
 
 ## Minimal API example
 
@@ -50,19 +55,29 @@ are required.
 #include <openephemeris/oe.h>
 
 oe_ephemeris *ephemeris = NULL;
-oe_time time;
-oe_position_result sun;
+oe_chart_result chart;
 
-if (oe_ephemeris_open("de440.bsp", NULL, &ephemeris) == OE_OK &&
-    oe_time_from_utc(2000, 1, 1, 12, 0, 0.0, 0.0, &time) == OE_OK &&
-    oe_position(ephemeris, OE_SUN, &time, &sun) == OE_OK) {
-    /* sun.longitude_deg and sun.longitude_speed_deg_per_day */
+if (oe_ephemeris_open_default(&ephemeris) == OE_OK &&
+    oe_chart_from_utc(ephemeris,
+                      2000, 1, 1, 12, 0, 0.0,
+                      52.3676, 4.9041,
+                      &chart) == OE_OK) {
+    /* chart.positions[OE_SUN].longitude_deg
+       chart.house_positions[OE_SUN]
+       chart.houses.ascendant_deg */
 }
 oe_ephemeris_close(ephemeris);
 ```
 
-Public angles are degrees, distances are AU, and speeds are per day. Local
-timezone/DST conversion is deliberately an application responsibility.
+`oe_ephemeris_open_default()` finds `data/de440.bsp` automatically. Set
+`OE_DATA_PATH` only when the data lives elsewhere. One `oe_chart_from_utc()`
+call returns all supported objects, Placidus cusps, Ascendant, MC, and the
+geometric house position of every available object.
+
+Public angles are degrees, distances are AU, and speeds are per day. Input is
+UTC; local timezone/DST conversion is deliberately an application
+responsibility. The lower-level time, position, and house functions remain
+available for applications that need explicit TT/UT1 control.
 
 ## Accuracy evidence
 
@@ -72,6 +87,15 @@ result is `280.368922564°`, a difference of about `0.048″` from Horizons'
 `280.3689092°`, within the stated `0.1″` planetary acceptance threshold.
 This single fixture proves the vertical calculation path; it does not replace
 the full body/date acceptance matrix required before 1.0.
+
+An independent NAIF SPICE N0067 fixture also checks geometric J2000 ICRF
+position and velocity for the Sun, Moon, and every planetary target exposed by
+the library. All 60 components agree within `1e-5 km` and `1e-10 km/s`.
+
+The type-21 evaluator is separately checked against a Horizons JPL#171
+heliocentric ICRF state vector at J2000. Its six state components agree within
+1 mm and `1e-9 km/s`; coverage boundaries and missing-kernel behavior are also
+tested.
 
 See [definitions](docs/DEFINITIONS.md), [provenance](docs/PROVENANCE.md), and
 [implementation status](docs/STATUS.md) before embedding the preview.

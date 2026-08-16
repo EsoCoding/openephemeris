@@ -12,6 +12,7 @@
 #define OE_J2000 2451545.0
 #define OE_DAY_S 86400.0
 #define OE_MAX_SEGMENTS 64
+#define OE_SPK21_MAX_TERMS 25
 
 typedef struct oe_vec3 { double x, y, z; } oe_vec3;
 typedef struct oe_state { oe_vec3 p, v; } oe_state;
@@ -40,6 +41,8 @@ oe_status oe_spk_open(oe_spk *spk, const char *path);
 void oe_spk_close(oe_spk *spk);
 oe_status oe_spk_state(const oe_spk *spk, int target, int center,
                        double et, oe_state *out);
+oe_status oe_spk_direct_state(const oe_spk *spk, int target, int center,
+                              double et, oe_state *out);
 oe_status oe_apparent_position(const oe_ephemeris *e, int target,
                                const oe_time *time, oe_position_result *out);
 oe_status oe_lunar_point(const oe_ephemeris *e, oe_body body,

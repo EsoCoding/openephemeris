@@ -4,6 +4,10 @@
 - Distances are astronomical units and radial speeds are AU/day.
 - Planetary results are apparent geocentric directions: iterative light time,
   solar deflection, annual aberration, IAU 2006 ecliptic-of-date, and IAU 2000A nutation longitude.
+- JPL Horizons' `ObsEcLon` compatibility column uses the older IAU76/80
+  ecliptic-of-date. It is therefore not an interchangeable sub-arcsecond
+  reference away from J2000; raw ICRF statevectors are used to validate the
+  SPK reader independently of this frame-definition difference.
 - The mean node uses the conventional mean lunar ascending-node polynomial.
 - The true node is the ascending intersection of the instantaneous geocentric
   lunar orbital plane and IAU 2006 ecliptic of date.

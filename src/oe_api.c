@@ -1,9 +1,20 @@
 #include "oe_internal.h"
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 const char *oe_version(void) { return "0.1.0"; }
+
+const char *oe_body_name(oe_body body) {
+    static const char *names[OE_BODY_COUNT] = {
+        "Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn",
+        "Uranus", "Neptune", "Pluto", "Mean Node", "True Node",
+        "Mean South Node", "True South Node", "Mean Lilith", "True Lilith",
+        "Chiron"
+    };
+    return body >= OE_SUN && body <= OE_CHIRON ? names[body] : "Unknown";
+}
 
 const char *oe_status_string(oe_status s) {
     switch (s) {
@@ -39,6 +50,41 @@ oe_status oe_ephemeris_open(const char *planetary, const char *chiron,
     return OE_OK;
 }
 
+static oe_status open_from_directory(const char *directory, oe_ephemeris **out) {
+    char planetary[4096], chiron[4096];
+    FILE *file;
+    int n;
+    if (!directory || !*directory) return OE_ERR_INVALID_ARGUMENT;
+    n = snprintf(planetary, sizeof(planetary), "%s/%s", directory, "de440.bsp");
+    if (n < 0 || (size_t)n >= sizeof(planetary)) return OE_ERR_INVALID_ARGUMENT;
+    n = snprintf(chiron, sizeof(chiron), "%s/%s", directory,
+                 "chiron-2060-1800-2200.bsp");
+    if (n < 0 || (size_t)n >= sizeof(chiron)) return OE_ERR_INVALID_ARGUMENT;
+    file = fopen(chiron, "rb");
+    if (file) { fclose(file); return oe_ephemeris_open(planetary, chiron, out); }
+    return oe_ephemeris_open(planetary, NULL, out);
+}
+
+oe_status oe_ephemeris_open_default(oe_ephemeris **out) {
+    static const char *directories[] = { "data", ".", "../data" };
+    const char *environment;
+    oe_status status;
+    size_t i;
+    if (!out) return OE_ERR_INVALID_ARGUMENT;
+    *out = NULL;
+    environment = getenv("OE_DATA_PATH");
+    if (environment && *environment) {
+        status = open_from_directory(environment, out);
+        if (status == OE_OK || status != OE_ERR_IO) return status;
+    }
+    for (i = 0; i < sizeof(directories) / sizeof(directories[0]); ++i) {
+        status = open_from_directory(directories[i], out);
+        if (status == OE_OK) return OE_OK;
+        if (status != OE_ERR_IO) return status;
+    }
+    return OE_ERR_IO;
+}
+
 void oe_ephemeris_close(oe_ephemeris *e) {
     if (!e) return;
     oe_spk_close(&e->planetary);
@@ -60,7 +106,7 @@ oe_status oe_position(const oe_ephemeris *e, oe_body body,
         return oe_lunar_point(e, body, time, out);
     if (body == OE_CHIRON) {
         if (!e->has_chiron) return OE_ERR_NO_COVERAGE;
-        return oe_apparent_position(e, 2002060, time, out);
+        return oe_apparent_position(e, 20002060, time, out);
     }
     return OE_ERR_INVALID_ARGUMENT;
 }
