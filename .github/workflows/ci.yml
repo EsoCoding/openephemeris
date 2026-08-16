@@ -1,0 +1,26 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    strategy: { matrix: { cc: [gcc, clang] } }
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build -DOE_WARNINGS_AS_ERRORS=ON
+        env: { CC: "${{ matrix.cc }}" }
+      - run: cmake --build build --parallel
+      - run: ctest --test-dir build --output-on-failure
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build -DOE_WARNINGS_AS_ERRORS=ON
+      - run: cmake --build build --config Release --parallel
+      - run: ctest --test-dir build -C Release --output-on-failure
+  sanitizers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build -DOE_BUILD_SHARED=OFF -DCMAKE_C_FLAGS="-fsanitize=address,undefined" -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+      - run: cmake --build build --parallel
+      - run: ctest --test-dir build --output-on-failure

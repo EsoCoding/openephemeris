@@ -1,0 +1,8 @@
+/build*/
+/data/*.bsp
+/data/*.json
+*.so
+*.dll
+*.dylib
+*.a
+*.lib
