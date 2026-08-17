@@ -102,6 +102,22 @@ typedef struct oe_chart_result {
     uint32_t reserved;
 } oe_chart_result;
 
+typedef enum oe_house_system {
+    OE_HOUSE_PLACIDUS = 'P',
+    OE_HOUSE_KOCH = 'K',
+    OE_HOUSE_PORPHYRY = 'O',
+    OE_HOUSE_REGIOMONTANUS = 'R',
+    OE_HOUSE_CAMPANUS = 'C',
+    OE_HOUSE_EQUAL = 'A',
+    OE_HOUSE_WHOLE_SIGN = 'W',
+    OE_HOUSE_ALCABITIUS = 'B',
+    OE_HOUSE_TOPOCENTRIC = 'T',
+    OE_HOUSE_MORINUS = 'M',
+    OE_HOUSE_MERIDIAN = 'X',
+    OE_HOUSE_VEHLOW = 'V',
+    OE_HOUSE_EQUAL_MC = 'D'
+} oe_house_system;
+
 OE_API const char *oe_version(void);
 OE_API const char *oe_status_string(oe_status status);
 OE_API oe_status oe_ephemeris_open(const char *planetary_kernel,
@@ -116,8 +132,18 @@ OE_API oe_status oe_time_from_utc(int year, int month, int day, int hour,
                                   oe_time *out);
 OE_API oe_status oe_position(const oe_ephemeris *ephemeris, oe_body body,
                              const oe_time *time, oe_position_result *out);
+OE_API oe_status oe_houses(const oe_time *time, double latitude_deg,
+                           double longitude_deg, int house_system,
+                           oe_house_result *out);
 OE_API oe_status oe_placidus_houses(const oe_time *time, double latitude_deg,
                                     double longitude_deg, oe_house_result *out);
+OE_API oe_status oe_house_position(const oe_time *time,
+                                   double latitude_deg,
+                                   double longitude_deg,
+                                   int house_system,
+                                   double right_ascension_deg,
+                                   double declination_deg,
+                                   double *house_position);
 OE_API oe_status oe_placidus_house_position(const oe_time *time,
                                             double latitude_deg,
                                             double longitude_deg,

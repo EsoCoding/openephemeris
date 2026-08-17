@@ -15,7 +15,14 @@ static void test_time(void){
     assert(oe_time_from_utc(2000,2,29,0,0,0,NAN,&t)==OE_OK);
 }
 static void test_houses(void){
-    oe_time t;oe_house_result h;int i;double hp;
+    static const int systems[] = {
+        OE_HOUSE_PLACIDUS, OE_HOUSE_KOCH, OE_HOUSE_PORPHYRY,
+        OE_HOUSE_REGIOMONTANUS, OE_HOUSE_CAMPANUS, OE_HOUSE_EQUAL,
+        OE_HOUSE_WHOLE_SIGN, OE_HOUSE_ALCABITIUS, OE_HOUSE_TOPOCENTRIC,
+        OE_HOUSE_MORINUS, OE_HOUSE_MERIDIAN, OE_HOUSE_VEHLOW,
+        OE_HOUSE_EQUAL_MC
+    };
+    oe_time t;oe_house_result h;int i, s_idx;double hp;
     assert(oe_time_from_jd(2451545.0,2451545.0,&t)==OE_OK);
     assert(oe_placidus_houses(&t,0.0,79.5394,&h)==OE_OK);
     for(i=0;i<6;i++)assert(separation(h.cusps_deg[i+6],h.cusps_deg[i]+180)<1e-8);
@@ -25,8 +32,14 @@ static void test_houses(void){
     assert(fabs(hp-10)<1e-8);
     assert(oe_placidus_houses(&t,90,0,&h)==OE_ERR_INVALID_ARGUMENT);
     for(i=-50;i<=50;i+=10){
-        assert(oe_placidus_houses(&t,(double)i,5.0,&h)==OE_OK);
-        assert(h.ascendant_deg>=0&&h.ascendant_deg<360);
+        for(s_idx=0;s_idx<(int)(sizeof(systems)/sizeof(systems[0]));s_idx++){
+            assert(oe_houses(&t,(double)i,5.0,systems[s_idx],&h)==OE_OK);
+            assert(h.ascendant_deg>=0&&h.ascendant_deg<360);
+            assert(h.midheaven_deg>=0&&h.midheaven_deg<360);
+            for(int c=0;c<12;c++){
+                assert(h.cusps_deg[c]>=0&&h.cusps_deg[c]<360);
+            }
+        }
     }
 }
 static void test_abi(void){
