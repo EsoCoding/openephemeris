@@ -110,4 +110,48 @@ static void test_chiron_type21_optional(void){
            (2378496.5-OE_J2000)*OE_DAY_S-1.0,&state)==OE_ERR_NO_COVERAGE);
     oe_spk_close(&spk);
 }
-int main(void){test_abi();test_time();test_houses();test_spice_state_matrix_optional();test_de440_optional();test_chiron_type21_optional();test_simple_chart_optional();puts("OpenEphemeris tests passed");return 0;}
+static void test_astrology(void){
+    oe_aspect_info asp;
+    /* Signs */
+    assert(strcmp(oe_sign_name(OE_SIGN_ARIES), "Aries") == 0);
+    assert(strcmp(oe_sign_symbol(OE_SIGN_TAURUS), "♉") == 0);
+    assert(oe_longitude_sign(0.0) == OE_SIGN_ARIES);
+    assert(oe_longitude_sign(35.5) == OE_SIGN_TAURUS);
+    assert(fabs(oe_longitude_in_sign(35.5) - 5.5) < 1e-12);
+    assert(oe_sign_element(OE_SIGN_CANCER) == OE_ELEMENT_WATER);
+    assert(oe_sign_modality(OE_SIGN_LEO) == OE_MODALITY_FIXED);
+
+    /* Aspects */
+    assert(strcmp(oe_aspect_name(OE_ASPECT_TRINE), "Trine") == 0);
+    assert(strcmp(oe_aspect_symbol(OE_ASPECT_TRINE), "△") == 0);
+    assert(fabs(oe_aspect_angle(OE_ASPECT_TRINE) - 120.0) < 1e-12);
+
+    /* Exact Conjunction */
+    assert(oe_aspect_calculate(10.0, 1.0, 10.0, 0.5, 5.0, &asp) == OE_OK);
+    assert(asp.type == OE_ASPECT_CONJUNCTION);
+    assert(asp.orb_deg < 1e-12);
+    assert(asp.flags & OE_ASPECT_EXACT);
+
+    /* Trine: 10° Aries and 131° Leo -> diff 121°, target 120°, orb 1° */
+    assert(oe_aspect_calculate(10.0, 1.0, 131.0, 0.5, 5.0, &asp) == OE_OK);
+    assert(asp.type == OE_ASPECT_TRINE);
+    assert(fabs(asp.orb_deg - 1.0) < 1e-12);
+
+    /* Part of Fortune: ASC = 30°, Moon = 120°, Sun = 45° -> Day: 30 + 120 - 45 = 105° */
+    assert(fabs(oe_part_of_fortune(30.0, 45.0, 120.0, 0) - 105.0) < 1e-12);
+    /* Night: 30 + 45 - 120 = -45 = 315° */
+    assert(fabs(oe_part_of_fortune(30.0, 45.0, 120.0, 1) - 315.0) < 1e-12);
+}
+
+int main(void){
+    test_abi();
+    test_time();
+    test_houses();
+    test_astrology();
+    test_spice_state_matrix_optional();
+    test_de440_optional();
+    test_chiron_type21_optional();
+    test_simple_chart_optional();
+    puts("OpenEphemeris tests passed");
+    return 0;
+}

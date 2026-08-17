@@ -118,6 +118,68 @@ typedef enum oe_house_system {
     OE_HOUSE_EQUAL_MC = 'D'
 } oe_house_system;
 
+typedef enum oe_zodiac_sign {
+    OE_SIGN_ARIES = 0,
+    OE_SIGN_TAURUS,
+    OE_SIGN_GEMINI,
+    OE_SIGN_CANCER,
+    OE_SIGN_LEO,
+    OE_SIGN_VIRGO,
+    OE_SIGN_LIBRA,
+    OE_SIGN_SCORPIO,
+    OE_SIGN_SAGITTARIUS,
+    OE_SIGN_CAPRICORN,
+    OE_SIGN_AQUARIUS,
+    OE_SIGN_PISCES
+} oe_zodiac_sign;
+
+typedef enum oe_element {
+    OE_ELEMENT_FIRE = 0,
+    OE_ELEMENT_EARTH,
+    OE_ELEMENT_AIR,
+    OE_ELEMENT_WATER
+} oe_element;
+
+typedef enum oe_modality {
+    OE_MODALITY_CARDINAL = 0,
+    OE_MODALITY_FIXED,
+    OE_MODALITY_MUTABLE
+} oe_modality;
+
+typedef enum oe_aspect_type {
+    OE_ASPECT_NONE = 0,
+    OE_ASPECT_CONJUNCTION,    /* 0° */
+    OE_ASPECT_SEMISEXTILE,    /* 30° */
+    OE_ASPECT_SEMISQUARE,     /* 45° */
+    OE_ASPECT_SEXTILE,        /* 60° */
+    OE_ASPECT_QUINTILE,       /* 72° */
+    OE_ASPECT_SQUARE,         /* 90° */
+    OE_ASPECT_TRINE,          /* 120° */
+    OE_ASPECT_SESQUIQUADRATE, /* 135° */
+    OE_ASPECT_BIQUINTILE,     /* 144° */
+    OE_ASPECT_QUINCUNX,       /* 150° */
+    OE_ASPECT_OPPOSITION,     /* 180° */
+    OE_ASPECT_PARALLEL,       /* Equal declination */
+    OE_ASPECT_CONTRAPARALLEL  /* Opposite declination */
+} oe_aspect_type;
+
+typedef enum oe_aspect_flag {
+    OE_ASPECT_APPLYING  = 1u << 0,
+    OE_ASPECT_SEPARATING = 1u << 1,
+    OE_ASPECT_EXACT     = 1u << 2
+} oe_aspect_flag;
+
+typedef struct oe_aspect_info {
+    int body1;                  /* oe_body or angle (-1 for ASC, -2 for MC) */
+    int body2;
+    oe_aspect_type type;
+    double angle_deg;           /* Exact nominal aspect angle */
+    double actual_diff_deg;     /* Measured separation */
+    double orb_deg;             /* Absolute deviation from exact aspect */
+    double max_orb_deg;         /* Max allowed orb */
+    uint32_t flags;             /* OE_ASPECT_APPLYING / SEPARATING / EXACT */
+} oe_aspect_info;
+
 OE_API const char *oe_version(void);
 OE_API const char *oe_status_string(oe_status status);
 OE_API oe_status oe_ephemeris_open(const char *planetary_kernel,
@@ -155,6 +217,32 @@ OE_API oe_status oe_chart_from_utc(const oe_ephemeris *ephemeris,
                                    int hour, int minute, double second,
                                    double latitude_deg, double longitude_deg,
                                    oe_chart_result *out);
+
+/* Astrological analysis & computations */
+OE_API const char *oe_sign_name(oe_zodiac_sign sign);
+OE_API const char *oe_sign_symbol(oe_zodiac_sign sign);
+OE_API oe_zodiac_sign oe_longitude_sign(double longitude_deg);
+OE_API double oe_longitude_in_sign(double longitude_deg);
+OE_API oe_element oe_sign_element(oe_zodiac_sign sign);
+OE_API oe_modality oe_sign_modality(oe_zodiac_sign sign);
+
+OE_API const char *oe_aspect_name(oe_aspect_type type);
+OE_API const char *oe_aspect_symbol(oe_aspect_type type);
+OE_API double oe_aspect_angle(oe_aspect_type type);
+OE_API double oe_aspect_default_orb(oe_aspect_type type, int body1, int body2);
+OE_API oe_status oe_aspect_calculate(double lon1, double speed1,
+                                     double lon2, double speed2,
+                                     double max_orb_override,
+                                     oe_aspect_info *out);
+OE_API oe_status oe_declination_aspect_calculate(double dec1, double dec_speed1,
+                                                double dec2, double dec_speed2,
+                                                double max_orb_override,
+                                                oe_aspect_info *out);
+OE_API size_t oe_chart_aspects(const oe_chart_result *chart,
+                               oe_aspect_info *out_aspects,
+                               size_t max_count);
+OE_API double oe_part_of_fortune(double ascendant_deg, double sun_lon_deg,
+                                 double moon_lon_deg, int is_night_chart);
 
 #ifdef __cplusplus
 }

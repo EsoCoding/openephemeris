@@ -35,7 +35,8 @@ set(OE_SOURCES
     src/oe_spk.c
     src/oe_astro.c
     src/oe_lunar.c
-    src/oe_houses.c)
+    src/oe_houses.c
+    src/oe_aspects.c)
 
 file(GLOB ERFA_SOURCES CONFIGURE_DEPENDS third_party/erfa/src/*.c)
 list(FILTER ERFA_SOURCES EXCLUDE REGEX "/t_erfa_c(_extra)?\\.c$")
@@ -111,5 +112,14 @@ if(OE_BUILD_TESTS)
       VERBATIM)
 endif()
 
-add_executable(oe-example examples/positions.c)
-target_link_libraries(oe-example PRIVATE OpenEphemeris::static)
+set(OE_EXAMPLES
+    01_planetary_positions
+    02_house_systems
+    03_natal_chart
+    04_aspect_matrix
+    05_custom_time)
+
+foreach(example ${OE_EXAMPLES})
+  add_executable(oe-example-${example} examples/${example}.c)
+  target_link_libraries(oe-example-${example} PRIVATE OpenEphemeris::static)
+endforeach()
