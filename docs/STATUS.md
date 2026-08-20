@@ -10,8 +10,8 @@
 - Chiron from a checksum-pinned Horizons JPL#171 kernel for 1800--2200.
 - Placidus cusps, Ascendant, MC, ARMC, and geometric mundane position.
 - UTC/TT/UT1 conversion with explicit modeled-time quality flags.
-- Simple `oe_ephemeris_open_default()` data discovery and one-call
-  `oe_chart_from_utc()` calculation for ordinary application use.
+- Simple `oe_ephemeris_open_default()` data discovery and separate JD-based
+  position/house calculations for ordinary application use.
 - Fixed-star lookup and apparent ecliptic positions for the built-in bright-star
   catalogue.
 - Ayanamsa, sidereal positions/houses, and nakshatra/pada calculation.
@@ -32,4 +32,7 @@
 - Sanitizer/fuzzer corpus and external legal provenance review.
 
 The project intentionally reports a development version until these gates are
-closed; the current ABI reports version 0.2.0.
+closed; the current ABI reports version 0.4.0. The 0.4 API is a deliberate
+breaking change: public calculation functions now receive one `jd_ut`; TT is
+derived internally and the former `oe_time` calculation entrypoints, chart
+result type and aggregate chart constructor were removed.

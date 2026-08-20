@@ -17,3 +17,7 @@
   circumpolar geometry is an error and never triggers a fallback.
 - Civil timezone and DST resolution are outside this library. `oe_time_from_utc`
   interprets the supplied fields as UTC; direct TT/UT1 input is authoritative.
+- Public calculation functions use one `jd_ut` input. Planetary TT is derived
+  internally with Delta-T; house geometry uses the supplied UT date for Earth
+  rotation. Applications should convert civil UTC to this JD once and reuse it
+  for positions, houses and aspects.

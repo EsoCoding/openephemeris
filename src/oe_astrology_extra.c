@@ -46,18 +46,19 @@ const oe_fixed_star *oe_fixed_star_find(const char *name) {
     return NULL;
 }
 
-oe_status oe_fixed_star_position(const oe_fixed_star *star, const oe_time *time,
-                                 oe_position_result *out) {
+oe_status oe_fixed_star_position_at_jd(const oe_fixed_star *star, double jd_ut,
+                                        oe_position_result *out) {
     double ra, dec, lon, lat;
     double years;
-    if (!star || !time || !out || time->struct_size < sizeof(*time) ||
-        time->abi_version != OE_ABI_VERSION) return OE_ERR_INVALID_ARGUMENT;
-    years = (time->jd_tt - OE_J2000) / 365.25;
+    oe_time time;
+    if (!star || !out || oe_time_from_ut_jd(jd_ut, &time) != OE_OK)
+        return OE_ERR_INVALID_ARGUMENT;
+    years = (time.jd_tt - OE_J2000) / 365.25;
     ra = star->ra_j2000_deg * OE_D2R +
          star->proper_motion_ra_mas_year * OE_D2R / 3600000.0 * years;
     dec = star->dec_j2000_deg * OE_D2R +
           star->proper_motion_dec_mas_year * OE_D2R / 3600000.0 * years;
-    eraEqec06(2400000.5, time->jd_tt - 2400000.5, ra, dec, &lon, &lat);
+    eraEqec06(2400000.5, time.jd_tt - 2400000.5, ra, dec, &lon, &lat);
     memset(out, 0, sizeof(*out));
     out->struct_size = sizeof(*out); out->abi_version = OE_ABI_VERSION;
     out->longitude_deg = oe_norm_deg(lon * OE_R2D);
@@ -66,11 +67,12 @@ oe_status oe_fixed_star_position(const oe_fixed_star *star, const oe_time *time,
     return OE_OK;
 }
 
-double oe_ayanamsa(const oe_time *time, oe_ayanamsa_mode mode,
-                   double user_value_deg) {
+double oe_ayanamsa_at_jd(double jd_ut, oe_ayanamsa_mode mode,
+                         double user_value_deg) {
     double t, base;
-    if (!time || !isfinite(time->jd_tt)) return NAN;
-    t = (time->jd_tt - OE_J2000) / 36525.0;
+    oe_time time;
+    if (oe_time_from_ut_jd(jd_ut, &time) != OE_OK) return NAN;
+    t = (time.jd_tt - OE_J2000) / 36525.0;
     if (mode == OE_AYANAMSA_USER) return user_value_deg;
     /* Linearized Swiss Ephemeris-compatible starting points, with the common
      * 50.29 arcsec/year precession rate. */
@@ -88,14 +90,14 @@ double oe_ayanamsa(const oe_time *time, oe_ayanamsa_mode mode,
     return base + 0.5029 * t;
 }
 
-oe_status oe_sidereal_position(const oe_ephemeris *e, oe_body body,
-                               const oe_time *time, oe_ayanamsa_mode mode,
+oe_status oe_sidereal_position_at_jd(const oe_ephemeris *e, oe_body body,
+                               double jd_ut, oe_ayanamsa_mode mode,
                                double user_value_deg, oe_sidereal_result *out) {
     oe_position_result p;
     double a;
-    if (!e || !time || !out) return OE_ERR_INVALID_ARGUMENT;
-    if (oe_position(e, body, time, &p) != OE_OK) return OE_ERR_NO_COVERAGE;
-    a = oe_ayanamsa(time, mode, user_value_deg);
+    if (!e || !out) return OE_ERR_INVALID_ARGUMENT;
+    if (oe_position_at_jd(e, body, jd_ut, &p) != OE_OK) return OE_ERR_NO_COVERAGE;
+    a = oe_ayanamsa_at_jd(jd_ut, mode, user_value_deg);
     if (!isfinite(a)) return OE_ERR_INVALID_ARGUMENT;
     memset(out, 0, sizeof(*out)); out->struct_size = sizeof(*out);
     out->abi_version = OE_ABI_VERSION; out->ayanamsa_deg = a;
@@ -107,13 +109,14 @@ oe_status oe_sidereal_position(const oe_ephemeris *e, oe_body body,
     return OE_OK;
 }
 
-oe_status oe_sidereal_houses(const oe_time *time, double lat, double lon,
+oe_status oe_sidereal_houses_at_jd(double jd_ut,
+                             double lat, double lon,
                              int system, oe_ayanamsa_mode mode,
                              double user_value_deg, oe_house_result *out) {
     oe_status s; double a; int i;
-    if (!time || !out) return OE_ERR_INVALID_ARGUMENT;
-    s = oe_houses(time, lat, lon, system, out); if (s != OE_OK) return s;
-    a = oe_ayanamsa(time, mode, user_value_deg);
+    if (!out) return OE_ERR_INVALID_ARGUMENT;
+    s = oe_houses_at_jd(jd_ut, lat, lon, system, out); if (s != OE_OK) return s;
+    a = oe_ayanamsa_at_jd(jd_ut, mode, user_value_deg);
     out->ascendant_deg = oe_norm_deg(out->ascendant_deg - a);
     out->midheaven_deg = oe_norm_deg(out->midheaven_deg - a);
     out->armc_deg = oe_norm_deg(out->armc_deg - a);
@@ -122,29 +125,35 @@ oe_status oe_sidereal_houses(const oe_time *time, double lat, double lon,
 }
 
 static oe_status search_body(const oe_ephemeris *e, oe_body body, double target,
-                             const oe_time *start, int direction, double days,
+                             double start_jd_ut,
+                             int direction, double days,
                              oe_search_result *out) {
     double jd0, jd, prev, cur, step, end, x, y, mid, fmid;
     oe_time t; oe_position_result p; int i, n;
-    if (!e || !start || !out || (direction != 1 && direction != -1) ||
+    if (!e || !out || !isfinite(start_jd_ut) ||
+        (direction != 1 && direction != -1) ||
         !isfinite(days) || days <= 0.0) return OE_ERR_INVALID_ARGUMENT;
-    step = direction * 0.25; jd0 = start->jd_tt; end = jd0 + direction * days;
-    t = *start; if (oe_position(e, body, &t, &p) != OE_OK) return OE_ERR_NO_COVERAGE;
+    step = direction * 0.25; jd0 = start_jd_ut; end = jd0 + direction * days;
+    if (oe_time_from_ut_jd(jd0, &t) != OE_OK ||
+        oe_position_time(e, body, &t, &p) != OE_OK) return OE_ERR_NO_COVERAGE;
     prev = remainder(p.longitude_deg - target, 360.0); n = (int)ceil(days / 0.25);
     for (i = 1; i <= n; ++i) {
         jd = jd0 + direction * fmin(days, i * 0.25); t.jd_tt = jd;
-        if (oe_position(e, body, &t, &p) != OE_OK) return OE_ERR_NO_COVERAGE;
+        if (oe_time_from_ut_jd(jd, &t) != OE_OK ||
+            oe_position_time(e, body, &t, &p) != OE_OK) return OE_ERR_NO_COVERAGE;
         cur = remainder(p.longitude_deg - target, 360.0);
         if ((direction > 0 && cur >= 0.0 && prev <= 0.0) ||
             (direction < 0 && cur <= 0.0 && prev >= 0.0) || fabs(cur) < 1e-7) {
             x = jd - step; y = jd; if (direction < 0) { x = jd; y = jd - step; }
             for (int k = 0; k < 45; ++k) {
-                mid = (x + y) * 0.5; t.jd_tt = mid; oe_position(e, body, &t, &p);
+                mid = (x + y) * 0.5;
+                oe_time_from_ut_jd(mid, &t); oe_position_time(e, body, &t, &p);
                 fmid = remainder(p.longitude_deg - target, 360.0);
                 if ((direction > 0 && fmid > 0.0) || (direction < 0 && fmid < 0.0)) y = mid;
                 else x = mid;
             }
-            t.jd_tt = (x + y) * 0.5; oe_position(e, body, &t, &p);
+            oe_time_from_ut_jd((x + y) * 0.5, &t);
+            oe_position_time(e, body, &t, &p);
             memset(out, 0, sizeof(*out)); out->struct_size = sizeof(*out);
             out->abi_version = OE_ABI_VERSION; out->time = t; out->position = p;
             out->target_longitude_deg = oe_norm_deg(target);
@@ -157,47 +166,55 @@ static oe_status search_body(const oe_ephemeris *e, oe_body body, double target,
 }
 
 oe_status oe_transit_search(const oe_ephemeris *e, oe_body body, double target,
-                            const oe_time *start, int direction, double days,
+                            double start_jd_ut,
+                            int direction, double days,
                             oe_search_result *out) {
-    return search_body(e, body, target, start, direction, days, out);
+    return search_body(e, body, target, start_jd_ut,
+                       direction, days, out);
 }
 oe_status oe_return_search(const oe_ephemeris *e, oe_body body, double natal,
-                           const oe_time *start, int direction, double days,
+                           double start_jd_ut,
+                           int direction, double days,
                            oe_search_result *out) {
-    return search_body(e, body, natal, start, direction, days, out);
+    return search_body(e, body, natal, start_jd_ut,
+                       direction, days, out);
 }
 
 oe_status oe_eclipse_search(const oe_ephemeris *e, oe_eclipse_type type,
-                            const oe_time *start, int direction, double days,
+                            double start_jd_ut,
+                            int direction, double days,
                             oe_eclipse_result *out) {
     oe_search_result phase; oe_time t; oe_position_result sun, moon;
     double target = type == OE_ECLIPSE_SOLAR ? 0.0 : 180.0;
     double jd0, jd, prev, cur, step, x, y, mid, fmid;
     int i, n;
-    if (!e || !start || !out) return OE_ERR_INVALID_ARGUMENT;
+    if (!e || !out || !isfinite(start_jd_ut)) return OE_ERR_INVALID_ARGUMENT;
     if ((direction != 1 && direction != -1) || days <= 0.0) return OE_ERR_INVALID_ARGUMENT;
-    jd0 = start->jd_tt; step = direction * 0.25; n = (int)ceil(days / 0.25);
-    t = *start; if (oe_position(e, OE_SUN, &t, &sun) != OE_OK ||
-        oe_position(e, OE_MOON, &t, &moon) != OE_OK) return OE_ERR_NO_COVERAGE;
+    jd0 = start_jd_ut; step = direction * 0.25; n = (int)ceil(days / 0.25);
+    if (oe_time_from_ut_jd(jd0, &t) != OE_OK ||
+        oe_position_time(e, OE_SUN, &t, &sun) != OE_OK ||
+        oe_position_time(e, OE_MOON, &t, &moon) != OE_OK) return OE_ERR_NO_COVERAGE;
     prev = remainder(moon.longitude_deg - sun.longitude_deg - target, 360.0);
     for (i = 1; i <= n; ++i) {
         jd = jd0 + direction * fmin(days, i * 0.25); t.jd_tt = jd;
-        if (oe_position(e, OE_SUN, &t, &sun) != OE_OK ||
-            oe_position(e, OE_MOON, &t, &moon) != OE_OK) return OE_ERR_NO_COVERAGE;
+        if (oe_time_from_ut_jd(jd, &t) != OE_OK ||
+            oe_position_time(e, OE_SUN, &t, &sun) != OE_OK ||
+            oe_position_time(e, OE_MOON, &t, &moon) != OE_OK) return OE_ERR_NO_COVERAGE;
         cur = remainder(moon.longitude_deg - sun.longitude_deg - target, 360.0);
         if ((direction > 0 && cur >= 0.0 && prev <= 0.0) ||
             (direction < 0 && cur <= 0.0 && prev >= 0.0) || fabs(cur) < 1e-7) {
             x = jd - step; y = jd; if (direction < 0) { x = jd; y = jd - step; }
             for (int k = 0; k < 45; ++k) {
                 mid = (x + y) * 0.5; t.jd_tt = mid;
-                oe_position(e, OE_SUN, &t, &sun); oe_position(e, OE_MOON, &t, &moon);
+                oe_time_from_ut_jd(mid, &t);
+                oe_position_time(e, OE_SUN, &t, &sun); oe_position_time(e, OE_MOON, &t, &moon);
                 fmid = remainder(moon.longitude_deg - sun.longitude_deg - target, 360.0);
                 if ((direction > 0 && fmid > 0.0) || (direction < 0 && fmid < 0.0)) y = mid;
                 else x = mid;
             }
-            t.jd_tt = (x + y) * 0.5;
-            if (oe_position(e, OE_SUN, &t, &sun) != OE_OK ||
-                oe_position(e, OE_MOON, &t, &moon) != OE_OK) return OE_ERR_NO_COVERAGE;
+            oe_time_from_ut_jd((x + y) * 0.5, &t);
+            if (oe_position_time(e, OE_SUN, &t, &sun) != OE_OK ||
+                oe_position_time(e, OE_MOON, &t, &moon) != OE_OK) return OE_ERR_NO_COVERAGE;
             memset(&phase, 0, sizeof(phase)); phase.time = t; phase.position = moon;
             break;
         }

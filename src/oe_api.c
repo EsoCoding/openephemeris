@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-const char *oe_version(void) { return "0.2.0"; }
+const char *oe_version(void) { return "0.4.0"; }
 
 const char *oe_body_name(oe_body body) {
     static const char *names[OE_BODY_COUNT] = {
@@ -92,8 +92,8 @@ void oe_ephemeris_close(oe_ephemeris *e) {
     free(e);
 }
 
-oe_status oe_position(const oe_ephemeris *e, oe_body body,
-                      const oe_time *time, oe_position_result *out) {
+oe_status oe_position_time(const oe_ephemeris *e, oe_body body,
+                           const oe_time *time, oe_position_result *out) {
     static const int ids[] = {10, 301, 1, 2, 4, 5, 6, 7, 8, 9};
     if (!e || !time || !out || time->struct_size < sizeof(*time) ||
         time->abi_version != OE_ABI_VERSION || !isfinite(time->jd_tt))
@@ -109,4 +109,13 @@ oe_status oe_position(const oe_ephemeris *e, oe_body body,
         return oe_apparent_position(e, 20002060, time, out);
     }
     return OE_ERR_INVALID_ARGUMENT;
+}
+
+oe_status oe_position_at_jd(const oe_ephemeris *e, oe_body body,
+                            double jd_ut,
+                            oe_position_result *out) {
+    oe_time time;
+    oe_status status = oe_time_from_ut_jd(jd_ut, &time);
+    if (status != OE_OK) return status;
+    return oe_position_time(e, body, &time, out);
 }

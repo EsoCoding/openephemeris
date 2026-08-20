@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(OpenEphemeris VERSION 0.2.0 LANGUAGES C)
+project(OpenEphemeris VERSION 0.4.0 LANGUAGES C)
 
 option(OE_BUILD_SHARED "Build the shared library" ON)
 option(OE_BUILD_TESTS "Build tests" ON)
@@ -30,7 +30,6 @@ add_custom_target(oe-data
 
 set(OE_SOURCES
     src/oe_api.c
-    src/oe_chart.c
     src/oe_time.c
     src/oe_spk.c
     src/oe_astro.c
@@ -116,12 +115,13 @@ endif()
 set(OE_EXAMPLES
     01_planetary_positions
     02_house_systems
-    03_natal_chart
+    03_individual_calculations
     04_aspect_matrix
     05_custom_time
     06_fixed_stars
     07_sidereal_vedic
-    08_transits_returns_eclipses)
+    08_transits_returns_eclipses
+    09_julian_date_api)
 
 foreach(example ${OE_EXAMPLES})
   add_executable(oe-example-${example} examples/${example}.c)

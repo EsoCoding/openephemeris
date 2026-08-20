@@ -22,18 +22,18 @@ static void test_houses(void){
         OE_HOUSE_MORINUS, OE_HOUSE_MERIDIAN, OE_HOUSE_VEHLOW,
         OE_HOUSE_EQUAL_MC
     };
-    oe_time t;oe_house_result h;int i, s_idx;double hp;
-    assert(oe_time_from_jd(2451545.0,2451545.0,&t)==OE_OK);
-    assert(oe_placidus_houses(&t,0.0,79.5394,&h)==OE_OK);
+    oe_house_result h;int i, s_idx;double hp;
+    const double jd_ut=2451545.0;
+    assert(oe_houses_at_jd(jd_ut,0.0,79.5394,OE_HOUSE_PLACIDUS,&h)==OE_OK);
     for(i=0;i<6;i++)assert(separation(h.cusps_deg[i+6],h.cusps_deg[i]+180)<1e-8);
     assert(separation(h.ascendant_deg,h.cusps_deg[0])<1e-12);
     assert(separation(h.midheaven_deg,h.cusps_deg[9])<1e-12);
-    assert(oe_placidus_house_position(&t,0,79.5394,h.armc_deg,0,&hp)==OE_OK);
+    assert(oe_house_position_at_jd(jd_ut,0,79.5394,OE_HOUSE_PLACIDUS,h.armc_deg,0,&hp)==OE_OK);
     assert(fabs(hp-10)<1e-8);
-    assert(oe_placidus_houses(&t,90,0,&h)==OE_ERR_INVALID_ARGUMENT);
+    assert(oe_houses_at_jd(jd_ut,90,0,OE_HOUSE_PLACIDUS,&h)==OE_ERR_INVALID_ARGUMENT);
     for(i=-50;i<=50;i+=10){
         for(s_idx=0;s_idx<(int)(sizeof(systems)/sizeof(systems[0]));s_idx++){
-            assert(oe_houses(&t,(double)i,5.0,systems[s_idx],&h)==OE_OK);
+            assert(oe_houses_at_jd(jd_ut,(double)i,5.0,systems[s_idx],&h)==OE_OK);
             assert(h.ascendant_deg>=0&&h.ascendant_deg<360);
             assert(h.midheaven_deg>=0&&h.midheaven_deg<360);
             for(int c=0;c<12;c++){
@@ -44,16 +44,16 @@ static void test_houses(void){
 }
 static void test_abi(void){
     FILE *file;unsigned char invalid[1024]={0};oe_ephemeris *e=(oe_ephemeris*)1;
-    assert(strcmp(oe_version(),"0.2.0")==0);
+    assert(strcmp(oe_version(),"0.4.0")==0);
     assert(strcmp(oe_status_string(OE_ERR_NO_COVERAGE),"no ephemeris coverage")==0);
     assert(oe_ephemeris_open(NULL,NULL,NULL)==OE_ERR_INVALID_ARGUMENT);
     file=fopen("oe-invalid.bsp","wb");assert(file);assert(fwrite(invalid,1,sizeof(invalid),file)==sizeof(invalid));assert(fclose(file)==0);
     assert(oe_ephemeris_open("oe-invalid.bsp",NULL,&e)==OE_ERR_BAD_KERNEL);assert(e==NULL);assert(remove("oe-invalid.bsp")==0);
 }
 static void test_de440_optional(void){
-    const char *path=getenv("OE_TEST_KERNEL");oe_ephemeris *e;oe_time t;oe_position_result p;
+    const char *path=getenv("OE_TEST_KERNEL");oe_ephemeris *e;oe_position_result p;
     if(!path)return;assert(oe_ephemeris_open(path,NULL,&e)==OE_OK);
-    assert(oe_time_from_utc(2000,1,1,12,0,0,0,&t)==OE_OK);assert(oe_position(e,OE_SUN,&t,&p)==OE_OK);
+    assert(oe_position_at_jd(e,OE_SUN,2451545.0,&p)==OE_OK);
     /* JPL Horizons DE441, apparent geocentric ecliptic-of-date, 2000-01-01 12:00 UTC. */
     assert(separation(p.longitude_deg,280.3689092)<0.1/3600.0);
     assert(fabs(p.latitude_deg-0.0002381)<0.1/3600.0);oe_ephemeris_close(e);
@@ -79,15 +79,16 @@ static void test_spice_state_matrix_optional(void){
     }
     oe_spk_close(&spk);
 }
-static void test_simple_chart_optional(void){
-    oe_ephemeris *e;oe_chart_result chart;oe_status status;
+static void test_simple_positions_optional(void){
+    oe_ephemeris *e;oe_position_result position;oe_house_result houses;
+    oe_status status;
     if(!getenv("OE_TEST_KERNEL"))return;
     status=oe_ephemeris_open_default(&e);assert(status==OE_OK);
-    status=oe_chart_from_utc(e,2000,1,1,12,0,0,52.3676,4.9041,&chart);assert(status==OE_OK);
-    assert(chart.position_status[OE_SUN]==OE_OK);assert(chart.house_status[OE_SUN]==OE_OK);
-    assert(chart.house_positions[OE_SUN]>=1&&chart.house_positions[OE_SUN]<13);
-    if(getenv("OE_TEST_CHIRON"))assert(chart.position_status[OE_CHIRON]==OE_OK);
-    else assert(chart.position_status[OE_CHIRON]==OE_ERR_NO_COVERAGE);
+    assert(oe_position_at_jd(e,OE_SUN,2451545.0,&position)==OE_OK);
+    assert(oe_houses_at_jd(2451545.0,52.3676,4.9041,
+                           OE_HOUSE_PLACIDUS,&houses)==OE_OK);
+    if(getenv("OE_TEST_CHIRON"))assert(oe_position_at_jd(e,OE_CHIRON,2451545.0,&position)==OE_OK);
+    else assert(oe_position_at_jd(e,OE_CHIRON,2451545.0,&position)==OE_ERR_NO_COVERAGE);
     oe_ephemeris_close(e);
 }
 static void test_chiron_type21_optional(void){
@@ -148,15 +149,30 @@ static void test_sidereal_and_stars(void){
     assert(oe_time_from_jd(2451545.0,2451545.0,&t)==OE_OK);
     assert(oe_fixed_star_count() >= 10);
     star = oe_fixed_star_find("aldebaran"); assert(star != NULL);
-    assert(oe_fixed_star_position(star,&t,&p)==OE_OK);
+    assert(oe_fixed_star_position_at_jd(star,2451545.0,&p)==OE_OK);
     assert(p.longitude_deg >= 0.0 && p.longitude_deg < 360.0);
-    assert(isfinite(oe_ayanamsa(&t,OE_AYANAMSA_LAHIRI,0.0)));
+    assert(isfinite(oe_ayanamsa_at_jd(2451545.0,OE_AYANAMSA_LAHIRI,0.0)));
     /* Sidereal and tropical positions are separated by the ayanamsa. */
     /* A kernel is needed for body positions, so exercise houses independently. */
-    assert(oe_sidereal_houses(&t,52.0,5.0,OE_HOUSE_PLACIDUS,
+    assert(oe_sidereal_houses_at_jd(2451545.0,52.0,5.0,OE_HOUSE_PLACIDUS,
                               OE_AYANAMSA_LAHIRI,0.0,&h)==OE_OK);
     assert(h.ascendant_deg >= 0.0 && h.ascendant_deg < 360.0);
     (void)s;
+}
+static void test_jd_wrappers_optional(void){
+    const char *path=getenv("OE_TEST_KERNEL");
+    oe_ephemeris *e;oe_position_result p;oe_house_result h;
+    oe_aspect_info a;
+    if(!path)return;
+    assert(oe_ephemeris_open(path,NULL,&e)==OE_OK);
+    assert(oe_position_at_jd(e,OE_SUN,2451545.0,&p)==OE_OK);
+    assert(fabs(p.longitude_deg-280.3689092)<0.1/3600.0);
+    assert(oe_houses_at_jd(2451545.0,52.3676,4.9041,
+                           OE_HOUSE_WHOLE_SIGN,&h)==OE_OK);
+    assert(oe_aspect_between_bodies_at_jd(e,OE_SUN,OE_MOON,
+                                          2451545.0,
+                                          10.0,&a)==OE_OK);
+    oe_ephemeris_close(e);
 }
 
 int main(void){
@@ -165,10 +181,11 @@ int main(void){
     test_houses();
     test_astrology();
     test_sidereal_and_stars();
+    test_jd_wrappers_optional();
     test_spice_state_matrix_optional();
     test_de440_optional();
     test_chiron_type21_optional();
-    test_simple_chart_optional();
+    test_simple_positions_optional();
     puts("OpenEphemeris tests passed");
     return 0;
 }

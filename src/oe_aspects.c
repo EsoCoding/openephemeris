@@ -195,6 +195,30 @@ oe_status oe_aspect_calculate(double lon1, double speed1,
     return OE_OK;
 }
 
+oe_status oe_aspect_between_bodies_at_jd(const oe_ephemeris *ephemeris,
+                                         oe_body body1, oe_body body2,
+                                         double jd_ut,
+                                         double max_orb_override,
+                                         oe_aspect_info *out) {
+    oe_position_result p1, p2;
+    oe_status status;
+    if (!ephemeris || !out) return OE_ERR_INVALID_ARGUMENT;
+    status = oe_position_at_jd(ephemeris, body1, jd_ut, &p1);
+    if (status != OE_OK) return status;
+    status = oe_position_at_jd(ephemeris, body2, jd_ut, &p2);
+    if (status != OE_OK) return status;
+    status = oe_aspect_calculate(p1.longitude_deg,
+                                 p1.longitude_speed_deg_per_day,
+                                 p2.longitude_deg,
+                                 p2.longitude_speed_deg_per_day,
+                                 max_orb_override, out);
+    if (status == OE_OK) {
+        out->body1 = (int)body1;
+        out->body2 = (int)body2;
+    }
+    return status;
+}
+
 oe_status oe_declination_aspect_calculate(double dec1, double dec_speed1,
                                           double dec2, double dec_speed2,
                                           double max_orb_override,
@@ -235,67 +259,6 @@ oe_status oe_declination_aspect_calculate(double dec1, double dec_speed1,
     }
 
     return OE_OK;
-}
-
-size_t oe_chart_aspects(const oe_chart_result *chart,
-                        oe_aspect_info *out_aspects,
-                        size_t max_count) {
-    size_t count = 0;
-    size_t i, j;
-
-    if (!chart || !out_aspects || max_count == 0) return 0;
-
-    /* Planetary aspects between bodies */
-    for (i = 0; i < OE_BODY_COUNT; i++) {
-        if (chart->position_status[i] != OE_OK) continue;
-        for (j = i + 1; j < OE_BODY_COUNT; j++) {
-            oe_aspect_info asp;
-            if (chart->position_status[j] != OE_OK) continue;
-
-            if (oe_aspect_calculate(chart->positions[i].longitude_deg,
-                                    chart->positions[i].longitude_speed_deg_per_day,
-                                    chart->positions[j].longitude_deg,
-                                    chart->positions[j].longitude_speed_deg_per_day,
-                                    0.0 /* use per-aspect default orb */,
-                                    &asp) == OE_OK && asp.type != OE_ASPECT_NONE) {
-                asp.body1 = (int)i;
-                asp.body2 = (int)j;
-                if (count < max_count) {
-                    out_aspects[count++] = asp;
-                }
-            }
-        }
-
-        /* Aspect with Ascendant (body2 = -1) */
-        {
-            oe_aspect_info asp;
-            double max_orb = (i == OE_SUN || i == OE_MOON) ? 8.0 : 5.0;
-            if (oe_aspect_calculate(chart->positions[i].longitude_deg,
-                                    chart->positions[i].longitude_speed_deg_per_day,
-                                    chart->houses.ascendant_deg,
-                                    0.0, max_orb, &asp) == OE_OK && asp.type != OE_ASPECT_NONE) {
-                asp.body1 = (int)i;
-                asp.body2 = -1; /* ASC */
-                if (count < max_count) out_aspects[count++] = asp;
-            }
-        }
-
-        /* Aspect with Midheaven (body2 = -2) */
-        {
-            oe_aspect_info asp;
-            double max_orb = (i == OE_SUN || i == OE_MOON) ? 8.0 : 5.0;
-            if (oe_aspect_calculate(chart->positions[i].longitude_deg,
-                                    chart->positions[i].longitude_speed_deg_per_day,
-                                    chart->houses.midheaven_deg,
-                                    0.0, max_orb, &asp) == OE_OK && asp.type != OE_ASPECT_NONE) {
-                asp.body1 = (int)i;
-                asp.body2 = -2; /* MC */
-                if (count < max_count) out_aspects[count++] = asp;
-            }
-        }
-    }
-
-    return count;
 }
 
 double oe_part_of_fortune(double ascendant_deg, double sun_lon_deg,

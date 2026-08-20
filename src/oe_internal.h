@@ -37,6 +37,7 @@ double oe_norm_deg(double angle);
 double oe_mean_obliquity_rad(double jd_tt);
 double oe_gmst_deg(double jd_ut1, double jd_tt);
 double oe_delta_t_seconds(double year);
+oe_status oe_time_from_ut_jd(double jd_ut1, oe_time *out);
 oe_status oe_spk_open(oe_spk *spk, const char *path);
 void oe_spk_close(oe_spk *spk);
 oe_status oe_spk_state(const oe_spk *spk, int target, int center,
@@ -47,5 +48,14 @@ oe_status oe_apparent_position(const oe_ephemeris *e, int target,
                                const oe_time *time, oe_position_result *out);
 oe_status oe_lunar_point(const oe_ephemeris *e, oe_body body,
                          const oe_time *time, oe_position_result *out);
+oe_status oe_position_time(const oe_ephemeris *e, oe_body body,
+                           const oe_time *time, oe_position_result *out);
+oe_status oe_houses_time(const oe_time *time, double latitude_deg,
+                         double longitude_deg, int house_system,
+                         oe_house_result *out);
+oe_status oe_house_position_time(const oe_time *time, double latitude_deg,
+                                 double longitude_deg, int house_system,
+                                 double right_ascension_deg,
+                                 double declination_deg, double *out);
 
 #endif

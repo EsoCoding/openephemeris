@@ -61,6 +61,19 @@ oe_status oe_time_from_jd(double tt, double ut1, oe_time *out) {
     out->jd_tt=tt; out->jd_ut1=ut1; out->quality=OE_TIME_EXACT; return OE_OK;
 }
 
+oe_status oe_time_from_ut_jd(double ut1, oe_time *out) {
+    double year;
+    if (!out || !isfinite(ut1)) return OE_ERR_INVALID_ARGUMENT;
+    year = 2000.0 + (ut1 - OE_J2000) / 365.2425;
+    memset(out, 0, sizeof(*out));
+    out->struct_size = sizeof(*out);
+    out->abi_version = OE_ABI_VERSION;
+    out->jd_ut1 = ut1;
+    out->jd_tt = ut1 + oe_delta_t_seconds(year) / OE_DAY_S;
+    out->quality = OE_TIME_DELTA_T_MODELED;
+    return OE_OK;
+}
+
 oe_status oe_time_from_utc(int y,int m,int d,int h,int min,double sec,double dut1,oe_time *out) {
     double jd, dy, dt; int tai=-1; size_t i; uint32_t q=0;
     if (!out || !valid_date(y,m,d) || h<0 || h>23 || min<0 || min>59 ||
@@ -75,6 +88,11 @@ oe_status oe_time_from_utc(int y,int m,int d,int h,int min,double sec,double dut
     if (tai>=0) { out->jd_tt=jd+(tai+32.184)/OE_DAY_S; q|=OE_TIME_LEAP_SECONDS_KNOWN; if(y>2026) q|=OE_TIME_FUTURE_UTC; }
     else { dt=oe_delta_t_seconds(dy); out->jd_tt=out->jd_ut1+dt/OE_DAY_S; q|=OE_TIME_DELTA_T_MODELED; }
     out->quality=q; return OE_OK;
+}
+
+oe_status oe_utc_to_jd(int y, int m, int d, int h, int min, double sec,
+                       double dut1, oe_time *out) {
+    return oe_time_from_utc(y, m, d, h, min, sec, dut1, out);
 }
 
 double oe_mean_obliquity_rad(double jd) {

@@ -22,7 +22,7 @@ extern "C" {
 
 #define OE_ABI_VERSION 1u
 #define OE_VERSION_MAJOR 0
-#define OE_VERSION_MINOR 2
+#define OE_VERSION_MINOR 4
 #define OE_VERSION_PATCH 0
 
 typedef struct oe_ephemeris oe_ephemeris;
@@ -88,19 +88,6 @@ typedef struct oe_house_result {
     uint32_t flags;
     uint32_t reserved;
 } oe_house_result;
-
-typedef struct oe_chart_result {
-    uint32_t struct_size;
-    uint32_t abi_version;
-    oe_time time;
-    oe_house_result houses;
-    oe_position_result positions[OE_BODY_COUNT];
-    double house_positions[OE_BODY_COUNT];
-    int32_t position_status[OE_BODY_COUNT];
-    int32_t house_status[OE_BODY_COUNT];
-    uint32_t flags;
-    uint32_t reserved;
-} oe_chart_result;
 
 typedef enum oe_house_system {
     OE_HOUSE_PLACIDUS = 'P',
@@ -259,31 +246,21 @@ OE_API oe_status oe_time_from_jd(double jd_tt, double jd_ut1, oe_time *out);
 OE_API oe_status oe_time_from_utc(int year, int month, int day, int hour,
                                   int minute, double second, double dut1_seconds,
                                   oe_time *out);
-OE_API oe_status oe_position(const oe_ephemeris *ephemeris, oe_body body,
-                             const oe_time *time, oe_position_result *out);
-OE_API oe_status oe_houses(const oe_time *time, double latitude_deg,
-                           double longitude_deg, int house_system,
-                           oe_house_result *out);
-OE_API oe_status oe_placidus_houses(const oe_time *time, double latitude_deg,
-                                    double longitude_deg, oe_house_result *out);
-OE_API oe_status oe_house_position(const oe_time *time,
-                                   double latitude_deg,
-                                   double longitude_deg,
-                                   int house_system,
-                                   double right_ascension_deg,
-                                   double declination_deg,
-                                   double *house_position);
-OE_API oe_status oe_placidus_house_position(const oe_time *time,
-                                            double latitude_deg,
-                                            double longitude_deg,
-                                            double right_ascension_deg,
-                                            double declination_deg,
-                                            double *house_position);
-OE_API oe_status oe_chart_from_utc(const oe_ephemeris *ephemeris,
-                                   int year, int month, int day,
-                                   int hour, int minute, double second,
-                                   double latitude_deg, double longitude_deg,
-                                   oe_chart_result *out);
+OE_API oe_status oe_utc_to_jd(int year, int month, int day, int hour,
+                              int minute, double second, double dut1_seconds,
+                              oe_time *out);
+OE_API oe_status oe_position_at_jd(const oe_ephemeris *ephemeris, oe_body body,
+                                   double jd_ut,
+                                   oe_position_result *out);
+OE_API oe_status oe_houses_at_jd(double jd_ut,
+                                 double latitude_deg, double longitude_deg,
+                                 int house_system, oe_house_result *out);
+OE_API oe_status oe_house_position_at_jd(double jd_ut,
+                                         double latitude_deg,
+                                         double longitude_deg, int house_system,
+                                         double right_ascension_deg,
+                                         double declination_deg,
+                                         double *house_position);
 
 /* Astrological analysis & computations */
 OE_API const char *oe_sign_name(oe_zodiac_sign sign);
@@ -301,13 +278,14 @@ OE_API oe_status oe_aspect_calculate(double lon1, double speed1,
                                      double lon2, double speed2,
                                      double max_orb_override,
                                      oe_aspect_info *out);
+OE_API oe_status oe_aspect_between_bodies_at_jd(
+    const oe_ephemeris *ephemeris, oe_body body1, oe_body body2,
+    double jd_ut, double max_orb_override,
+    oe_aspect_info *out);
 OE_API oe_status oe_declination_aspect_calculate(double dec1, double dec_speed1,
                                                 double dec2, double dec_speed2,
                                                 double max_orb_override,
                                                 oe_aspect_info *out);
-OE_API size_t oe_chart_aspects(const oe_chart_result *chart,
-                               oe_aspect_info *out_aspects,
-                               size_t max_count);
 OE_API double oe_part_of_fortune(double ascendant_deg, double sun_lon_deg,
                                  double moon_lon_deg, int is_night_chart);
 
@@ -315,17 +293,18 @@ OE_API double oe_part_of_fortune(double ascendant_deg, double sun_lon_deg,
 OE_API size_t oe_fixed_star_count(void);
 OE_API const oe_fixed_star *oe_fixed_star_at(size_t index);
 OE_API const oe_fixed_star *oe_fixed_star_find(const char *name);
-OE_API oe_status oe_fixed_star_position(const oe_fixed_star *star,
-                                        const oe_time *time,
-                                        oe_position_result *out);
-OE_API double oe_ayanamsa(const oe_time *time, oe_ayanamsa_mode mode,
-                          double user_value_deg);
-OE_API oe_status oe_sidereal_position(const oe_ephemeris *ephemeris,
-                                      oe_body body, const oe_time *time,
+OE_API oe_status oe_fixed_star_position_at_jd(const oe_fixed_star *star,
+                                               double jd_ut,
+                                               oe_position_result *out);
+OE_API double oe_ayanamsa_at_jd(double jd_ut, oe_ayanamsa_mode mode,
+                                double user_value_deg);
+OE_API oe_status oe_sidereal_position_at_jd(const oe_ephemeris *ephemeris,
+                                      oe_body body, double jd_ut,
                                       oe_ayanamsa_mode mode,
                                       double user_value_deg,
                                       oe_sidereal_result *out);
-OE_API oe_status oe_sidereal_houses(const oe_time *time, double latitude_deg,
+OE_API oe_status oe_sidereal_houses_at_jd(double jd_ut,
+                                    double latitude_deg,
                                     double longitude_deg, int house_system,
                                     oe_ayanamsa_mode mode, double user_value_deg,
                                     oe_house_result *out);
@@ -333,14 +312,16 @@ OE_API oe_status oe_sidereal_houses(const oe_time *time, double latitude_deg,
 /* Shared event search engine. direction is +1 or -1 and max_days is a bound. */
 OE_API oe_status oe_transit_search(const oe_ephemeris *ephemeris,
                                    oe_body body, double target_longitude_deg,
-                                   const oe_time *start, int direction,
+                                   double start_jd_ut,
+                                   int direction,
                                    double max_days, oe_search_result *out);
 OE_API oe_status oe_return_search(const oe_ephemeris *ephemeris,
                                   oe_body body, double natal_longitude_deg,
-                                  const oe_time *start, int direction,
+                                  double start_jd_ut,
+                                  int direction,
                                   double max_days, oe_search_result *out);
 OE_API oe_status oe_eclipse_search(const oe_ephemeris *ephemeris,
-                                   oe_eclipse_type type, const oe_time *start,
+                                   oe_eclipse_type type, double start_jd_ut,
                                    int direction, double max_days,
                                    oe_eclipse_result *out);
 

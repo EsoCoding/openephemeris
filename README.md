@@ -6,7 +6,7 @@ directly and exposes a small, versioned `oe_` C ABI. The core never downloads
 data, uses global mutable state, silently changes ephemeris, or substitutes a
 different house system.
 
-> Current release status: **0.2.0 development preview**, not 1.0. Planetary
+> Current release status: **0.4.0 development preview**, not 1.0. Planetary
 > DE440 calculations, Chiron, houses, fixed stars, sidereal calculations and
 > first transit/event APIs are operational. Broad independent validation
 > remains a documented 1.0 gate. See
@@ -61,24 +61,18 @@ and coverage.
 #include <openephemeris/oe.h>
 
 oe_ephemeris *ephemeris = NULL;
-oe_chart_result chart;
+oe_position_result sun;
 
 if (oe_ephemeris_open_default(&ephemeris) == OE_OK &&
-    oe_chart_from_utc(ephemeris,
-                      2000, 1, 1, 12, 0, 0.0,
-                      52.3676, 4.9041,
-                      &chart) == OE_OK) {
-    /* chart.positions[OE_SUN].longitude_deg
-       chart.house_positions[OE_SUN]
-       chart.houses.ascendant_deg */
+    oe_position_at_jd(ephemeris, OE_SUN, 2451545.0, &sun) == OE_OK) {
+    /* sun.longitude_deg */
 }
 oe_ephemeris_close(ephemeris);
 ```
 
 `oe_ephemeris_open_default()` finds `data/de440.bsp` automatically. Set
-`OE_DATA_PATH` only when the data lives elsewhere. One `oe_chart_from_utc()`
-call returns all supported objects, Placidus cusps, Ascendant, MC, and the
-geometric house position of every available object.
+`OE_DATA_PATH` only when the data lives elsewhere. Positions and houses are
+separate calls, matching the Swiss Ephemeris workflow.
 
 Public angles are degrees, distances are AU, and speeds are per day. Input is
 UTC; local timezone/DST conversion is deliberately an application
@@ -107,3 +101,8 @@ See [definitions](docs/DEFINITIONS.md), [provenance](docs/PROVENANCE.md), and
 [implementation status](docs/STATUS.md), the
 [astrological API guide](docs/ASTROLOGY.md), and the
 [1.0 release contract](docs/RELEASE_1_0.md) before embedding the preview.
+
+Julian Date is the only public calculation interface. The main entry points
+are `oe_position_at_jd()`, `oe_houses_at_jd()` and
+`oe_aspect_between_bodies_at_jd()`. See
+[`examples/09_julian_date_api.c`](examples/09_julian_date_api.c).

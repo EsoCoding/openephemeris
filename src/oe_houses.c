@@ -98,7 +98,7 @@ static void compute_time_params(const oe_time *t, double lond,
     *out_cose = cosd(eps_deg);
 }
 
-oe_status oe_houses(const oe_time *t, double latd, double lond, int house_system, oe_house_result *o) {
+oe_status oe_houses_time(const oe_time *t, double latd, double lond, int house_system, oe_house_result *o) {
     double armc, ekl, sine, cose, tane, tanfi, cosfi;
     double mc, asc, ic, desc, acmc;
     double a, c, f, fh1, fh2, xh1, xh2, rectasc, ad3, sina, cosa;
@@ -433,11 +433,7 @@ oe_status oe_houses(const oe_time *t, double latd, double lond, int house_system
     return OE_OK;
 }
 
-oe_status oe_placidus_houses(const oe_time *t, double latd, double lond, oe_house_result *o) {
-    return oe_houses(t, latd, lond, OE_HOUSE_PLACIDUS, o);
-}
-
-oe_status oe_house_position(const oe_time *t,
+oe_status oe_house_position_time(const oe_time *t,
                             double latd,
                             double lond,
                             int house_system,
@@ -487,7 +483,7 @@ oe_status oe_house_position(const oe_time *t,
     /* Fallback to cusp-based placement for other systems */
     {
         oe_house_result hr;
-        oe_status status = oe_houses(t, latd, lond, house_system, &hr);
+        oe_status status = oe_houses_time(t, latd, lond, house_system, &hr);
         double ecl_lon, ecl_lat, dist_diff;
         int cur_house;
         if (status != OE_OK) return status;
@@ -510,11 +506,19 @@ oe_status oe_house_position(const oe_time *t,
     }
 }
 
-oe_status oe_placidus_house_position(const oe_time *t,
-                                     double latd,
-                                     double lond,
-                                     double rad,
-                                     double decd,
-                                     double *out) {
-    return oe_house_position(t, latd, lond, OE_HOUSE_PLACIDUS, rad, decd, out);
+oe_status oe_houses_at_jd(double jd_ut, double latd, double lond,
+                          int house_system, oe_house_result *out) {
+    oe_time time;
+    oe_status status = oe_time_from_ut_jd(jd_ut, &time);
+    if (status != OE_OK) return status;
+    return oe_houses_time(&time, latd, lond, house_system, out);
+}
+
+oe_status oe_house_position_at_jd(double jd_ut, double latd,
+                                  double lond, int house_system, double rad,
+                                  double decd, double *out) {
+    oe_time time;
+    oe_status status = oe_time_from_ut_jd(jd_ut, &time);
+    if (status != OE_OK) return status;
+    return oe_house_position_time(&time, latd, lond, house_system, rad, decd, out);
 }

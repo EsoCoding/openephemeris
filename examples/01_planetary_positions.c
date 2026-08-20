@@ -33,7 +33,6 @@ static void print_formatted_position(const char *name, double lon_deg, double la
 
 int main(void) {
     oe_ephemeris *ephemeris = NULL;
-    oe_time time;
     oe_status status;
     size_t i;
 
@@ -45,25 +44,26 @@ int main(void) {
         return 1;
     }
 
-    /* 2. Convert UTC calendar date and time to high-precision oe_time */
-    /* Example: 2026-08-17 12:00:00 UTC */
-    status = oe_time_from_utc(2026, 8, 17, 12, 0, 0.0, NAN, &time);
+    /* 2. Convert UTC once; all calculations below use the resulting JD(UT). */
+    oe_time utc_jd;
+    status = oe_utc_to_jd(2026, 8, 17, 12, 0, 0.0, NAN, &utc_jd);
     if (status != OE_OK) {
-        fprintf(stderr, "Time error: %s\n", oe_status_string(status));
+        fprintf(stderr, "UTC to JD failed: %s\n", oe_status_string(status));
         oe_ephemeris_close(ephemeris);
         return 1;
     }
+    const double jd_ut = utc_jd.jd_ut1;
 
     printf("========================================================================================\n");
     printf(" OpenEphemeris - Planetary Positions (2026-08-17 12:00:00 UTC)\n");
-    printf(" Julian Date (TT): %.6f, (UT1): %.6f\n", time.jd_tt, time.jd_ut1);
+    printf(" Julian Date (UT): %.6f\n", jd_ut);
     printf("========================================================================================\n");
 
     /* 3. Calculate position for each astrological body */
     for (i = 0; i < OE_BODY_COUNT; ++i) {
         oe_position_result pos;
         oe_body body = (oe_body)i;
-        status = oe_position(ephemeris, body, &time, &pos);
+        status = oe_position_at_jd(ephemeris, body, jd_ut, &pos);
 
         if (status == OE_OK) {
             print_formatted_position(oe_body_name(body),

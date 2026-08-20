@@ -13,10 +13,10 @@
 #include <stdio.h>
 
 static void print_sidereal(const oe_ephemeris *ephemeris, oe_body body,
-                           const oe_time *time, oe_ayanamsa_mode mode,
+                           double jd_ut, oe_ayanamsa_mode mode,
                            const char *mode_name) {
     oe_sidereal_result result;
-    oe_status status = oe_sidereal_position(ephemeris, body, time, mode,
+    oe_status status = oe_sidereal_position_at_jd(ephemeris, body, jd_ut, mode,
                                             0.0, &result);
     if (status != OE_OK) {
         printf("%-12s unavailable (%s)\n", mode_name, oe_status_string(status));
@@ -29,8 +29,8 @@ static void print_sidereal(const oe_ephemeris *ephemeris, oe_body body,
 
 int main(void) {
     oe_ephemeris *ephemeris = NULL;
-    oe_time time;
     oe_house_result houses;
+    oe_time utc_jd;
     oe_status status;
 
     status = oe_ephemeris_open_default(&ephemeris);
@@ -39,21 +39,20 @@ int main(void) {
         fprintf(stderr, "Run: cmake --build build --target oe-data\n");
         return 1;
     }
-    status = oe_time_from_utc(1984, 6, 23, 5, 51, 0.0, NAN, &time);
-    if (status != OE_OK) {
-        fprintf(stderr, "Time conversion failed: %s\n", oe_status_string(status));
+    if (oe_utc_to_jd(1984, 6, 23, 5, 51, 0.0, NAN, &utc_jd) != OE_OK) {
         oe_ephemeris_close(ephemeris);
         return 1;
     }
+    const double jd_ut = utc_jd.jd_ut1;
 
     printf("OpenEphemeris - Sidereal and Vedic Calculations\n");
     printf("Body: Sun | Date: 1984-06-23 05:51:00 UTC\n\n");
-    print_sidereal(ephemeris, OE_SUN, &time, OE_AYANAMSA_LAHIRI, "Lahiri");
-    print_sidereal(ephemeris, OE_SUN, &time, OE_AYANAMSA_RAMAN, "Raman");
-    print_sidereal(ephemeris, OE_SUN, &time, OE_AYANAMSA_KRISHNAMURTI, "KP");
-    print_sidereal(ephemeris, OE_SUN, &time, OE_AYANAMSA_TRUE_CITRA, "True Citra");
+    print_sidereal(ephemeris, OE_SUN, jd_ut, OE_AYANAMSA_LAHIRI, "Lahiri");
+    print_sidereal(ephemeris, OE_SUN, jd_ut, OE_AYANAMSA_RAMAN, "Raman");
+    print_sidereal(ephemeris, OE_SUN, jd_ut, OE_AYANAMSA_KRISHNAMURTI, "KP");
+    print_sidereal(ephemeris, OE_SUN, jd_ut, OE_AYANAMSA_TRUE_CITRA, "True Citra");
 
-    status = oe_sidereal_houses(&time, 52.3594, 6.4665, OE_HOUSE_WHOLE_SIGN,
+    status = oe_sidereal_houses_at_jd(jd_ut, 52.3594, 6.4665, OE_HOUSE_WHOLE_SIGN,
                                 OE_AYANAMSA_LAHIRI, 0.0, &houses);
     if (status == OE_OK) {
         printf("\nLahiri sidereal Whole Sign houses:\n");

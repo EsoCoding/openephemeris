@@ -8,7 +8,7 @@ calculation of natal-chart and predictive astrology primitives.
 
 1. Tropical planetary positions, speeds, nodes, Lilith and Chiron.
 2. All documented house systems, angles and geometric house positions.
-3. Signs, aspects, Part of Fortune and chart-level calculations.
+3. Signs, aspects and Part of Fortune as separate calculations.
 4. Complete fixed-star catalogue with stable names, aliases and provenance.
 5. Sidereal zodiac and all promised ayanamsa modes with reference fixtures.
 6. Sidereal houses, Rahu/Ketu, nakshatra and pada calculations.
@@ -48,7 +48,15 @@ promoted by a later release decision.
 
 ## Current state
 
-The repository currently reports version 0.2.0. The new public examples and
+The repository currently reports version 0.4.0. The new public examples and
 the first fixed-star, sidereal, transit, return and eclipse APIs are available,
 but the quality gates above remain open. The project must not label this code
 1.0 until the independent validation and catalog/provenance work is complete.
+
+## API policy
+
+Julian Date is the standard and only public calculation input. Calculation
+functions receive one `jd_ut` directly. UTC conversion remains
+available as a utility for applications that need to derive those values, but
+there are no separate UTC calculation entrypoints or aggregate chart
+constructor.

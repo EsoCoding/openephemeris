@@ -27,11 +27,11 @@ static void print_eclipse(const char *label, const oe_eclipse_result *result) {
 
 int main(void) {
     oe_ephemeris *ephemeris = NULL;
-    oe_time start, natal_time;
     oe_position_result natal_sun, natal_moon;
     oe_position_result current_mars;
     oe_search_result result;
     oe_eclipse_result eclipse;
+    oe_time start_jd, natal_jd;
     oe_status status;
 
     status = oe_ephemeris_open_default(&ephemeris);
@@ -40,11 +40,16 @@ int main(void) {
         fprintf(stderr, "Run: cmake --build build --target oe-data\n");
         return 1;
     }
-    if (oe_time_from_utc(2026, 8, 20, 12, 0, 0.0, NAN, &start) != OE_OK ||
-        oe_time_from_utc(1984, 6, 23, 5, 51, 0.0, NAN, &natal_time) != OE_OK ||
-        oe_position(ephemeris, OE_SUN, &natal_time, &natal_sun) != OE_OK ||
-        oe_position(ephemeris, OE_MOON, &natal_time, &natal_moon) != OE_OK ||
-        oe_position(ephemeris, OE_MARS, &start, &current_mars) != OE_OK) {
+    if (oe_utc_to_jd(2026, 8, 20, 12, 0, 0.0, NAN, &start_jd) != OE_OK ||
+        oe_utc_to_jd(1984, 6, 23, 5, 51, 0.0, NAN, &natal_jd) != OE_OK) {
+        oe_ephemeris_close(ephemeris);
+        return 1;
+    }
+    const double start_jd_ut = start_jd.jd_ut1;
+    const double natal_jd_ut = natal_jd.jd_ut1;
+    if (oe_position_at_jd(ephemeris, OE_SUN, natal_jd_ut, &natal_sun) != OE_OK ||
+        oe_position_at_jd(ephemeris, OE_MOON, natal_jd_ut, &natal_moon) != OE_OK ||
+        oe_position_at_jd(ephemeris, OE_MARS, start_jd_ut, &current_mars) != OE_OK) {
         fprintf(stderr, "Could not prepare event inputs\n");
         oe_ephemeris_close(ephemeris);
         return 1;
@@ -58,27 +63,30 @@ int main(void) {
                         (current_mars.longitude_speed_deg_per_day < 0.0 ? -1.0 : 1.0);
         if (target >= 360.0) target -= 360.0;
         if (target < 0.0) target += 360.0;
-        status = oe_transit_search(ephemeris, OE_MARS, target, &start, 1, 30.0, &result);
+        status = oe_transit_search(ephemeris, OE_MARS, target, start_jd_ut,
+                                   1, 30.0, &result);
         if (status == OE_OK) print_search("Mars transit +1 deg", &result);
         else printf("Mars transit: %s\n", oe_status_string(status));
     }
 
     status = oe_return_search(ephemeris, OE_SUN, natal_sun.longitude_deg,
-                              &start, 1, 370.0, &result);
+                              start_jd_ut, 1, 370.0, &result);
     if (status == OE_OK) print_search("Solar return", &result);
     else printf("Solar return: %s\n", oe_status_string(status));
 
     status = oe_return_search(ephemeris, OE_MOON, natal_moon.longitude_deg,
-                              &start, 1, 35.0, &result);
+                              start_jd_ut, 1, 35.0, &result);
     if (status == OE_OK) print_search("Lunar return", &result);
     else printf("Lunar return: %s\n", oe_status_string(status));
 
-    status = oe_eclipse_search(ephemeris, OE_ECLIPSE_SOLAR, &start, 1,
+    status = oe_eclipse_search(ephemeris, OE_ECLIPSE_SOLAR, start_jd_ut,
+                               1,
                                400.0, &eclipse);
     if (status == OE_OK) print_eclipse("Solar eclipse", &eclipse);
     else printf("Solar eclipse: %s\n", oe_status_string(status));
 
-    status = oe_eclipse_search(ephemeris, OE_ECLIPSE_LUNAR, &start, 1,
+    status = oe_eclipse_search(ephemeris, OE_ECLIPSE_LUNAR, start_jd_ut,
+                               1,
                                400.0, &eclipse);
     if (status == OE_OK) print_eclipse("Lunar eclipse", &eclipse);
     else printf("Lunar eclipse: %s\n", oe_status_string(status));

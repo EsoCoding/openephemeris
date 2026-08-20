@@ -2,10 +2,11 @@
 #include <stdio.h>
 
 int main(void) {
+    const double jd_ut = 2445883.70208333;
     oe_ephemeris *ephemeris = NULL;
-    oe_chart_result chart;
+    oe_house_result houses;
     oe_status status;
-    size_t body;
+    int body;
 
     status = oe_ephemeris_open_default(&ephemeris);
     if (status != OE_OK) {
@@ -13,32 +14,26 @@ int main(void) {
                 oe_status_string(status));
         return 1;
     }
-
-    status = oe_chart_from_utc(ephemeris,
-                               1984, 6, 23, 5, 51, 0.0,
-                               52.3594, 6.4665,
-                               &chart);
+    status = oe_houses_at_jd(jd_ut, 52.3594, 6.4665,
+                             OE_HOUSE_PLACIDUS, &houses);
     if (status != OE_OK) {
-        fprintf(stderr, "Chart: %s\n", oe_status_string(status));
+        fprintf(stderr, "Houses: %s\n", oe_status_string(status));
         oe_ephemeris_close(ephemeris);
         return 1;
     }
-
-    printf("Ascendant %10.6f   MC %10.6f\n\n",
-           chart.houses.ascendant_deg, chart.houses.midheaven_deg);
-    for (body = 0; body < OE_BODY_COUNT; ++body) {
-        if (chart.position_status[body] == OE_OK) {
-            printf("%-16s %10.6f   house %5.2f\n",
-                   oe_body_name((oe_body)body),
-                   chart.positions[body].longitude_deg,
-                   chart.house_positions[body]);
+    printf("JD(UT) %.8f | Ascendant %10.6f | MC %10.6f\n\n",
+           jd_ut, houses.ascendant_deg, houses.midheaven_deg);
+    for (body = OE_SUN; body < OE_BODY_COUNT; ++body) {
+        oe_position_result position;
+        status = oe_position_at_jd(ephemeris, (oe_body)body, jd_ut, &position);
+        if (status == OE_OK) {
+            printf("%-16s %10.6f\n", oe_body_name((oe_body)body),
+                   position.longitude_deg);
         } else {
-            printf("%-16s unavailable (%s)\n",
-                   oe_body_name((oe_body)body),
-                   oe_status_string((oe_status)chart.position_status[body]));
+            printf("%-16s unavailable (%s)\n", oe_body_name((oe_body)body),
+                   oe_status_string(status));
         }
     }
-
     oe_ephemeris_close(ephemeris);
     return 0;
 }
