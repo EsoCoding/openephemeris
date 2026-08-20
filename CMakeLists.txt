@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(OpenEphemeris VERSION 0.1.0 LANGUAGES C)
+project(OpenEphemeris VERSION 0.2.0 LANGUAGES C)
 
 option(OE_BUILD_SHARED "Build the shared library" ON)
 option(OE_BUILD_TESTS "Build tests" ON)
@@ -36,7 +36,8 @@ set(OE_SOURCES
     src/oe_astro.c
     src/oe_lunar.c
     src/oe_houses.c
-    src/oe_aspects.c)
+    src/oe_aspects.c
+    src/oe_astrology_extra.c)
 
 file(GLOB ERFA_SOURCES CONFIGURE_DEPENDS third_party/erfa/src/*.c)
 list(FILTER ERFA_SOURCES EXCLUDE REGEX "/t_erfa_c(_extra)?\\.c$")
@@ -117,7 +118,10 @@ set(OE_EXAMPLES
     02_house_systems
     03_natal_chart
     04_aspect_matrix
-    05_custom_time)
+    05_custom_time
+    06_fixed_stars
+    07_sidereal_vedic
+    08_transits_returns_eclipses)
 
 foreach(example ${OE_EXAMPLES})
   add_executable(oe-example-${example} examples/${example}.c)

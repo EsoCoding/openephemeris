@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-const char *oe_version(void) { return "0.1.0"; }
+const char *oe_version(void) { return "0.2.0"; }
 
 const char *oe_body_name(oe_body body) {
     static const char *names[OE_BODY_COUNT] = {

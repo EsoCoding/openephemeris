@@ -22,7 +22,7 @@ extern "C" {
 
 #define OE_ABI_VERSION 1u
 #define OE_VERSION_MAJOR 0
-#define OE_VERSION_MINOR 1
+#define OE_VERSION_MINOR 2
 #define OE_VERSION_PATCH 0
 
 typedef struct oe_ephemeris oe_ephemeris;
@@ -169,6 +169,73 @@ typedef enum oe_aspect_flag {
     OE_ASPECT_EXACT     = 1u << 2
 } oe_aspect_flag;
 
+typedef enum oe_ayanamsa_mode {
+    OE_AYANAMSA_FAGAN_BRADLEY = 0,
+    OE_AYANAMSA_LAHIRI,
+    OE_AYANAMSA_RAMAN,
+    OE_AYANAMSA_KRISHNAMURTI,
+    OE_AYANAMSA_YUKTESHWAR,
+    OE_AYANAMSA_TRUE_CITRA,
+    OE_AYANAMSA_TRUE_REVATI,
+    OE_AYANAMSA_TRUE_PUSHYA,
+    OE_AYANAMSA_USER
+} oe_ayanamsa_mode;
+
+typedef struct oe_fixed_star {
+    uint32_t struct_size;
+    uint32_t abi_version;
+    const char *name;
+    const char *constellation;
+    double magnitude;
+    double ra_j2000_deg;
+    double dec_j2000_deg;
+    double proper_motion_ra_mas_year;
+    double proper_motion_dec_mas_year;
+} oe_fixed_star;
+
+typedef struct oe_sidereal_result {
+    uint32_t struct_size;
+    uint32_t abi_version;
+    double ayanamsa_deg;
+    double tropical_longitude_deg;
+    double sidereal_longitude_deg;
+    int nakshatra;
+    int pada;
+} oe_sidereal_result;
+
+typedef enum oe_search_kind {
+    OE_SEARCH_TRANSIT = 0,
+    OE_SEARCH_INGRESS,
+    OE_SEARCH_SOLAR_RETURN,
+    OE_SEARCH_LUNAR_RETURN
+} oe_search_kind;
+
+typedef struct oe_search_result {
+    uint32_t struct_size;
+    uint32_t abi_version;
+    oe_time time;
+    oe_position_result position;
+    double target_longitude_deg;
+    double residual_deg;
+    uint32_t flags;
+} oe_search_result;
+
+typedef enum oe_eclipse_type {
+    OE_ECLIPSE_SOLAR = 0,
+    OE_ECLIPSE_LUNAR
+} oe_eclipse_type;
+
+typedef struct oe_eclipse_result {
+    uint32_t struct_size;
+    uint32_t abi_version;
+    oe_eclipse_type type;
+    oe_time maximum;
+    double longitude_deg;
+    double latitude_deg;
+    double magnitude;
+    int totality;
+} oe_eclipse_result;
+
 typedef struct oe_aspect_info {
     int body1;                  /* oe_body or angle (-1 for ASC, -2 for MC) */
     int body2;
@@ -243,6 +310,39 @@ OE_API size_t oe_chart_aspects(const oe_chart_result *chart,
                                size_t max_count);
 OE_API double oe_part_of_fortune(double ascendant_deg, double sun_lon_deg,
                                  double moon_lon_deg, int is_night_chart);
+
+/* Fixed stars and sidereal astrology. */
+OE_API size_t oe_fixed_star_count(void);
+OE_API const oe_fixed_star *oe_fixed_star_at(size_t index);
+OE_API const oe_fixed_star *oe_fixed_star_find(const char *name);
+OE_API oe_status oe_fixed_star_position(const oe_fixed_star *star,
+                                        const oe_time *time,
+                                        oe_position_result *out);
+OE_API double oe_ayanamsa(const oe_time *time, oe_ayanamsa_mode mode,
+                          double user_value_deg);
+OE_API oe_status oe_sidereal_position(const oe_ephemeris *ephemeris,
+                                      oe_body body, const oe_time *time,
+                                      oe_ayanamsa_mode mode,
+                                      double user_value_deg,
+                                      oe_sidereal_result *out);
+OE_API oe_status oe_sidereal_houses(const oe_time *time, double latitude_deg,
+                                    double longitude_deg, int house_system,
+                                    oe_ayanamsa_mode mode, double user_value_deg,
+                                    oe_house_result *out);
+
+/* Shared event search engine. direction is +1 or -1 and max_days is a bound. */
+OE_API oe_status oe_transit_search(const oe_ephemeris *ephemeris,
+                                   oe_body body, double target_longitude_deg,
+                                   const oe_time *start, int direction,
+                                   double max_days, oe_search_result *out);
+OE_API oe_status oe_return_search(const oe_ephemeris *ephemeris,
+                                  oe_body body, double natal_longitude_deg,
+                                  const oe_time *start, int direction,
+                                  double max_days, oe_search_result *out);
+OE_API oe_status oe_eclipse_search(const oe_ephemeris *ephemeris,
+                                   oe_eclipse_type type, const oe_time *start,
+                                   int direction, double max_days,
+                                   oe_eclipse_result *out);
 
 #ifdef __cplusplus
 }

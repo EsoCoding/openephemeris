@@ -1,14 +1,15 @@
 # OpenEphemeris
 
 OpenEphemeris is a clean-room, permissively licensed C11 calculation library
-for high-precision tropical astrology. It reads official JPL SPK kernels
+for high-precision astrology. It reads official JPL SPK kernels
 directly and exposes a small, versioned `oe_` C ABI. The core never downloads
 data, uses global mutable state, silently changes ephemeris, or substitutes a
 different house system.
 
-> Current release status: **0.1.0 development preview**, not 1.0. Planetary
-> DE440 calculations, Chiron, and Placidus are operational. Broad independent
-> validation remains a documented 1.0 gate. See
+> Current release status: **0.2.0 development preview**, not 1.0. Planetary
+> DE440 calculations, Chiron, houses, fixed stars, sidereal calculations and
+> first transit/event APIs are operational. Broad independent validation
+> remains a documented 1.0 gate. See
 > [docs/STATUS.md](docs/STATUS.md).
 
 ## Implemented scope
@@ -17,7 +18,12 @@ different house system.
 - Sun, Moon, Mercury through Pluto using a JPL DE440 kernel;
 - Chiron using a pinned JPL Horizons type-21 kernel for 1800--2200;
 - mean/true lunar nodes and mean/true Black Moon Lilith;
-- Placidus cusps, Ascendant, MC, ARMC, and geometric house position;
+- all currently implemented house systems, Ascendant, MC, ARMC, and geometric
+  house position;
+- a built-in bright fixed-star catalogue with proper motion and apparent
+  ecliptic-of-date positions;
+- ayanamsa modes, sidereal positions/houses, and nakshatra/pada output;
+- bounded planetary transit/return search and a preliminary eclipse search;
 - explicit UTC/TT/UT1 handling and modeled-time quality flags;
 - endian-aware, bounds-checked DAF/SPK type 2, 3, and 21 input;
 - static and shared libraries on Linux and Windows-oriented CMake builds.
@@ -98,4 +104,6 @@ heliocentric ICRF state vector at J2000. Its six state components agree within
 tested.
 
 See [definitions](docs/DEFINITIONS.md), [provenance](docs/PROVENANCE.md), and
-[implementation status](docs/STATUS.md) before embedding the preview.
+[implementation status](docs/STATUS.md), the
+[astrological API guide](docs/ASTROLOGY.md), and the
+[1.0 release contract](docs/RELEASE_1_0.md) before embedding the preview.

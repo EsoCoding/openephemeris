@@ -44,7 +44,7 @@ static void test_houses(void){
 }
 static void test_abi(void){
     FILE *file;unsigned char invalid[1024]={0};oe_ephemeris *e=(oe_ephemeris*)1;
-    assert(strcmp(oe_version(),"0.1.0")==0);
+    assert(strcmp(oe_version(),"0.2.0")==0);
     assert(strcmp(oe_status_string(OE_ERR_NO_COVERAGE),"no ephemeris coverage")==0);
     assert(oe_ephemeris_open(NULL,NULL,NULL)==OE_ERR_INVALID_ARGUMENT);
     file=fopen("oe-invalid.bsp","wb");assert(file);assert(fwrite(invalid,1,sizeof(invalid),file)==sizeof(invalid));assert(fclose(file)==0);
@@ -142,12 +142,29 @@ static void test_astrology(void){
     /* Night: 30 + 45 - 120 = -45 = 315° */
     assert(fabs(oe_part_of_fortune(30.0, 45.0, 120.0, 1) - 315.0) < 1e-12);
 }
+static void test_sidereal_and_stars(void){
+    oe_time t; oe_sidereal_result s; oe_position_result p; oe_house_result h;
+    const oe_fixed_star *star;
+    assert(oe_time_from_jd(2451545.0,2451545.0,&t)==OE_OK);
+    assert(oe_fixed_star_count() >= 10);
+    star = oe_fixed_star_find("aldebaran"); assert(star != NULL);
+    assert(oe_fixed_star_position(star,&t,&p)==OE_OK);
+    assert(p.longitude_deg >= 0.0 && p.longitude_deg < 360.0);
+    assert(isfinite(oe_ayanamsa(&t,OE_AYANAMSA_LAHIRI,0.0)));
+    /* Sidereal and tropical positions are separated by the ayanamsa. */
+    /* A kernel is needed for body positions, so exercise houses independently. */
+    assert(oe_sidereal_houses(&t,52.0,5.0,OE_HOUSE_PLACIDUS,
+                              OE_AYANAMSA_LAHIRI,0.0,&h)==OE_OK);
+    assert(h.ascendant_deg >= 0.0 && h.ascendant_deg < 360.0);
+    (void)s;
+}
 
 int main(void){
     test_abi();
     test_time();
     test_houses();
     test_astrology();
+    test_sidereal_and_stars();
     test_spice_state_matrix_optional();
     test_de440_optional();
     test_chiron_type21_optional();
